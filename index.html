@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Sale Report</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --bg:#0f1115;--card:#171a21;--card2:#1d212a;--line:#2a2f3a;
+  --text:#eef0f3;--sub:#9aa3b2;--accent:#e63323;--accent2:#3ddc97;
+  --warn:#ffcc4d;--danger:#ff5c6c;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-tap-highlight-color:transparent;font-size:15px;}
+.wrap{max-width:560px;margin:0 auto;padding:12px 13px 100px;}
+.topbar{position:sticky;top:0;z-index:20;background:var(--bg);padding:10px 13px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);}
+.top-title{flex:1;min-width:0;}
+.top-title h1{font-size:15px;font-weight:700;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.top-title .dt{font-size:11.5px;color:var(--sub);}
+.top-actions{display:flex;gap:6px;}
+.icon-btn{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.sum-bar{display:flex;gap:8px;padding:10px 0 6px;flex-wrap:wrap;}
+.sum-pill{background:var(--card2);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--sub);}
+.sum-pill b{color:var(--text);}
+.mth-pill{background:#1a2a3a;border-color:#2a4a6a;color:#60a5d4;}
+.brand-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:8px 0 10px;}
+.btab{padding:7px 3px;border-radius:10px;background:var(--card2);color:var(--sub);font-size:11.5px;cursor:pointer;border:1px solid var(--line);white-space:nowrap;text-align:center;}
+.btab.act{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btab .bc{font-size:10px;margin-left:2px;opacity:.85;}
+.model-list{display:flex;flex-direction:column;gap:7px;padding-top:4px;}
+.model-card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px 13px;display:flex;align-items:center;gap:10px;transition:border-color .15s;}
+.model-card.sel{border-color:var(--accent);background:#1f1310;}
+.model-info{flex:1;min-width:0;}
+.model-name{font-size:13.5px;font-weight:600;line-height:1.3;}
+.model-card.sel .model-name{color:#ff8c7a;}
+.model-sub{font-size:11px;color:var(--sub);margin-top:2px;}
+.stepper{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.sb{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.sb:active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.sc{min-width:22px;text-align:center;font-weight:700;font-size:14px;color:var(--accent2);}
+.sc.zero{color:var(--sub);}
+.big-count{display:flex;align-items:center;justify-content:center;gap:16px;padding:18px 0 8px;}
+.big-btn{width:48px;height:48px;border-radius:14px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-size:26px;cursor:pointer;}
+.big-btn:active{background:var(--accent);}
+.big-count-num{font-size:40px;font-weight:700;min-width:56px;text-align:center;}
+.footer-bar{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(to top, var(--bg) 72%, transparent);padding:14px 16px 20px;display:flex;gap:9px;justify-content:center;}
+.btn-reset{flex:0 0 auto;padding:13px 15px;border-radius:13px;border:1px solid var(--line);background:var(--card2);color:var(--sub);font-size:13px;cursor:pointer;}
+.btn-go{flex:1;max-width:360px;background:var(--accent);color:#fff;border:none;border-radius:13px;padding:13px;font-size:15px;font-weight:900;cursor:pointer;letter-spacing:.5px;}
+.btn-go:active{opacity:.85;}
+.report-section{margin-top:16px;}
+.report-block{background:var(--card);border:1px solid var(--line);border-radius:13px;margin-bottom:12px;overflow:hidden;}
+.report-head{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);}
+.report-head span{font-size:13px;font-weight:600;color:var(--accent2);}
+.char-count{font-size:11px;padding:3px 8px;border-radius:20px;}
+.char-ok{background:#0d2a1f;color:var(--accent2);}
+.char-warn{background:#2a1010;color:var(--danger);}
+.report-pre{padding:12px 14px;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;font-family:'Menlo','Consolas',monospace;color:var(--text);}
+.copy-btn{width:calc(100% - 28px);margin:0 14px 14px;background:var(--accent2);color:#0d2a1f;border:none;border-radius:10px;padding:10px;font-weight:700;font-size:13.5px;cursor:pointer;}
+.copy-btn:active{opacity:.85;}
+.copy-btn.done{background:#5ad19b;}
+.screen{display:none;}
+.screen.act{display:block;}
+.settings-header{padding:14px 0 10px;display:flex;align-items:center;gap:10px;}
+.settings-header h2{font-size:16px;font-weight:700;}
+.back-btn{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-size:18px;cursor:pointer;flex-shrink:0;}
+.settings-list{display:flex;flex-direction:column;gap:7px;}
+.si{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.si-inp{background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:7px 10px;font-size:13px;width:100px;text-align:right;}
+.si-inp:focus{border-color:var(--accent);outline:none;}
+.sort-hint{font-size:12px;color:var(--sub);padding:8px 2px 10px;}
+.sort-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:7px;touch-action:none;}
+.sort-card.drag-target{border-color:var(--accent);border-style:dashed;}
+.hist-day{background:var(--card);border:1px solid var(--line);border-radius:13px;margin-bottom:10px;overflow:hidden;}
+.hist-head{padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+.hist-head-left{font-size:13.5px;font-weight:600;}
+.hist-head-right{font-size:12px;color:var(--sub);}
+.hist-body{border-top:1px solid var(--line);padding:12px 14px;}
+.hist-body pre{font-size:12px;line-height:1.6;white-space:pre-wrap;font-family:'Menlo','Consolas',monospace;color:var(--text);}
+.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.72);z-index:100;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s;}
+.overlay.show{opacity:1;pointer-events:auto;}
+.ov-box{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px 28px;max-width:300px;text-align:center;font-size:16px;font-weight:700;line-height:1.6;}
+.ov-box.rainbow-text{animation:rb 1s linear infinite;}
+@keyframes rb{0%{color:#e63323}16%{color:#ff9500}32%{color:#ffcc4d}48%{color:#3ddc97}64%{color:#5ac8fa}80%{color:#a78bfa}100%{color:#e63323}}
+.credit{text-align:center;font-size:11px;color:#3a3f4a;padding:6px 0 4px;margin-top:8px;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="screen-login" class="screen act" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;">
+  <div style="font-size:32px;font-weight:900;margin-bottom:8px;letter-spacing:-1px;">Sale Report</div>
+  <div style="font-size:13px;color:var(--sub);margin-bottom:32px;text-align:center;">ใส่รหัสร้านเพื่อเข้าใช้งาน</div>
+  <div style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px;">
+    <input id="shopCodeInput" type="text" placeholder="รหัสร้าน"
+      style="width:100%;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:14px 16px;font-size:16px;text-align:center;letter-spacing:2px;text-transform:uppercase;"
+      oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:900;cursor:pointer;">เข้าใช้งาน →</button>
+    <div id="loginStatus" style="text-align:center;font-size:12px;color:var(--sub);min-height:18px;"></div>
+  </div>
+  <div style="margin-top:32px;font-size:11px;color:#3a3f4a;">Made with ❤️ by Tora</div>
+</div>
+
+<!-- MAIN -->
+<div id="screen-main" class="screen">
+  <div class="topbar">
+    <div class="top-title">
+      <h1 id="shopNameTitle">Sale Report</h1>
+      <div class="dt" id="topDate"></div>
+    </div>
+    <div class="top-actions">
+      <div id="syncDot" title="สถานะ Sync" style="width:8px;height:8px;border-radius:50%;background:#888;margin-right:2px;align-self:center;flex-shrink:0;"></div>
+      <button class="icon-btn" onclick="goHistory()" title="ประวัติ">📋</button>
+      <button class="icon-btn" onclick="goSort()" title="จัดลำดับ">⇅</button>
+      <button class="icon-btn" onclick="goSettings()" title="ราคา RRP">⚙</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="sum-bar">
+      <div class="sum-pill">วันนี้: <b id="todayN">0</b> เครื่อง</div>
+      <div class="sum-pill">เดือนนี้: <b id="monthN">0</b> เครื่อง</div>
+      <div class="sum-pill mth-pill" id="mthLabel"></div>
+    </div>
+    <div class="brand-tabs" id="brandTabs"></div>
+    <div class="model-list" id="modelList"></div>
+    <div id="reportSection" class="report-section" style="display:none;"></div>
+    <div class="credit" id="creditLine">Made with ❤️ by Tora</div>
+  </div>
+
+  <div class="footer-bar">
+    <button class="btn-reset" onclick="resetToday()">รีเซ็ต</button>
+    <button class="btn-go" onclick="doGenerate()" style="flex:1.4;">FINISH!!</button>
+    <button class="btn-go" onclick="saveAndClose()" style="flex:0 0 auto;background:#1a6644;font-size:13.5px;padding:13px 16px;font-weight:900;letter-spacing:.5px;">Save</button>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="screen-settings" class="screen">
+  <div class="wrap">
+    <div class="settings-header">
+      <button class="back-btn" onclick="goMain()">←</button>
+      <h2>ตั้งค่าราคา RRP</h2>
+    </div>
+    <div class="brand-tabs" id="settingsTabs" style="display:flex;gap:6px;overflow-x:auto;padding:8px 0 10px;"></div>
+    <div class="settings-list" id="settingsList"></div>
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px;margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <div>
+        <div style="font-size:13px;font-weight:600;">เปลี่ยนรหัสร้าน</div>
+        <div style="font-size:11px;color:var(--sub);margin-top:2px;">ออกจากระบบเพื่อกลับไปหน้ากรอกรหัสร้าน</div>
+      </div>
+      <button onclick="doLogout()" style="flex-shrink:0;padding:9px 14px;border-radius:9px;border:1px solid var(--danger);background:transparent;color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;">🔑 ออกจากระบบ</button>
+    </div>
+    <div style="height:80px;"></div>
+  </div>
+  <div class="footer-bar">
+    <button class="btn-go" onclick="saveSettings()">บันทึกราคา ✓</button>
+  </div>
+</div>
+
+<!-- SORT -->
+<div id="screen-sort" class="screen">
+  <div class="wrap">
+    <div class="settings-header">
+      <button class="back-btn" onclick="saveSortAndBack()">←</button>
+      <h2>จัดลำดับรุ่น</h2>
+    </div>
+    <div class="brand-tabs" id="sortTabs" style="display:flex;gap:6px;overflow-x:auto;padding:8px 0 10px;"></div>
+    <div class="sort-hint">ลากแถบ ☰ เพื่อเปลี่ยนลำดับ</div>
+    <div id="sortList"></div>
+    <div style="height:80px;"></div>
+  </div>
+  <div class="footer-bar">
+    <button class="btn-go" onclick="saveSortAndBack()">บันทึกลำดับ ✓</button>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div id="screen-history" class="screen">
+  <div class="wrap">
+    <div class="settings-header">
+      <button class="back-btn" onclick="goMain()">←</button>
+      <h2>ประวัติรีพอร์ทย้อนหลัง</h2>
+    </div>
+    <div id="histList"></div>
+    <div style="height:80px;"></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="ov-box" id="ovMsg"></div>
+</div>
+
+<script>
+const NOW=new Date();
+const MK=NOW.getFullYear()+"-"+NOW.getMonth();
+
+// ─── BRAND CONFIG ──────────────────────────────────────────────
+const BRANDS=["OPPO","Vivo","Samsung","Xiaomi","Realme","Honor","Infinix","Apple"];
+const PC_DEF={OPPO:2,Vivo:2,Samsung:2,Xiaomi:1,Realme:1,Honor:1,Infinix:1,Apple:1};
+const BSHORT={OPPO:"O",Vivo:"V",Samsung:"S",Xiaomi:"Mi",Realme:"R",Honor:"Hn",Infinix:"Inf"};
+const NO_BILL=["ไม่เป็นไร พรุ่งนี้เอาใหม่ 💪","Rest Day วันนี้ พรุ่งนี้ลุยใหม่ 🔥","แค่วันนี้วันเดียว พรุ่งนี้ OPPO คืนชีพ!","บางวันก็เป็นแบบนี้ สู้ต่อเลย 🐯","วันนี้หยุดพักก็ได้ — พรุ่งนี้แก้แค้น!","OPPO ยังรักคุณอยู่แม้วันนี้ไม่มีบิล 🙏","ทุกคนมีวันแบบนี้ อย่าท้อนะ!"];
+const WIN_MSG=["OPPO ชนะทุกมิติ! ราชาแห่ง Shop! 🏆","วันนี้ OPPO เหนือกว่าทุกราง! 🔥","Vivo แพ้แล้ว! OPPO ยิ่งใหญ่ที่สุด! 👑","Champion ประจำวัน — ไม่มีใครกั้น OPPO! 🐯","OPPO โกยทั้งเงินและเครื่องวันนี้! 💰","เจ้าของ Shop วันนี้คือ OPPO ไม่มีเถียง! 🎯","No.1 วันนี้ขอยกให้ OPPO เต็มๆ! 🌟","OPPO ปราบ Vivo ได้สวยงามมาก! 🔴"];
+
+// ─── MODEL DATA (per-shop overrides for name/price/order/deleted are stored separately, see ST) ──
+const RAW={
+OPPO:[
+  {id:"op_a3x64",name:"A3x 64",rrp:2999},
+  {id:"op_a3x4128",name:"A3x 4/128",rrp:3999},
+  {id:"op_a3x6128",name:"A3x 6/128",rrp:4999},
+  {id:"op_a3128",name:"A3 128",rrp:5499},
+  {id:"op_a3256",name:"A3 256",rrp:6499},
+  {id:"op_a5x64",name:"A5x 64",rrp:3499},
+  {id:"op_a5x4128",name:"A5x 4/128",rrp:3999},
+  {id:"op_a5x6128",name:"A5x 6/128",rrp:4999},
+  {id:"op_a55g",name:"A5 5G",rrp:5999},
+  {id:"op_a5pro128",name:"A5Pro 5G 128",rrp:7499},
+  {id:"op_a5pro256",name:"A5Pro 5G 256",rrp:8999},
+  {id:"op_a6x64",name:"A6x 64",rrp:4299},
+  {id:"op_a6x4128",name:"A6x 5G 4/128",rrp:6699},
+  {id:"op_a6c64",name:"A6c 64",rrp:5499},
+  {id:"op_a6c128",name:"A6c 128",rrp:6499},
+  {id:"op_a64g",name:"A6 4G",rrp:7999},
+  {id:"op_a65g",name:"A6 5G",rrp:8499},
+  {id:"op_a6pro128",name:"A6 Pro 128",rrp:7999},
+  {id:"op_a6pro8256",name:"A6 Pro 8/256",rrp:9999},
+  {id:"op_a6pro12256",name:"A6 Pro 12/256",rrp:10999},
+  {id:"op_a6s128",name:"A6s 128",rrp:10999},
+  {id:"op_a6s256",name:"A6s 256",rrp:11999},
+  {id:"op_reno15f8256",name:"Reno15F 8/256",rrp:14999},
+  {id:"op_reno15f12256",name:"Reno15F 12/256",rrp:15999},
+  {id:"op_reno15_256",name:"Reno15 5G 256",rrp:18999},
+  {id:"op_reno15_512",name:"Reno15 5G 512",rrp:20999},
+  {id:"op_reno15pro",name:"Reno15 Pro",rrp:22999},
+  {id:"op_reno15promax",name:"Reno15 Pro Max 512",rrp:26999},
+  {id:"op_reno16f8128",name:"Reno16F 8/128",rrp:15999},
+  {id:"op_reno16f8256",name:"Reno16F 8/256",rrp:16999},
+  {id:"op_reno16_8256",name:"Reno16 8/256",rrp:19999},
+  {id:"op_reno16_12256",name:"Reno16 12/256",rrp:22999},
+  {id:"op_findx9_256",name:"Find X9 256",rrp:29999},
+  {id:"op_findx9_512",name:"Find X9 512",rrp:34999},
+  {id:"op_findx9s_256",name:"Find X9s 256",rrp:29999},
+  {id:"op_findx9s_512",name:"Find X9s 512",rrp:34999},
+  {id:"op_findx9pro",name:"Find X9 Pro",rrp:42999},
+  {id:"op_findx9ult512",name:"Find X9 ULT 512",rrp:54999},
+  {id:"op_findx9ult1tb",name:"Find X9 ULT 1Tb",rrp:69999},
+],
+Vivo:[
+  {id:"vi_y0564",name:"Y05 64",rrp:4599},
+  {id:"vi_y05128",name:"Y05 128",rrp:4999},
+  {id:"vi_y11d128",name:"Y11D 128",rrp:5499},
+  {id:"vi_y21d4128",name:"Y21D 4/128",rrp:4499},
+  {id:"vi_y21d6128",name:"Y21D 6/128",rrp:4999},
+  {id:"vi_y21d6256",name:"Y21D 6/256",rrp:5999},
+  {id:"vi_y31d128",name:"Y31D 128",rrp:7999},
+  {id:"vi_y31d256",name:"Y31D 256",rrp:9499},
+  {id:"vi_y315g128",name:"Y31 5G 128",rrp:7499},
+  {id:"vi_y395g",name:"Y39 5G",rrp:7999},
+  {id:"vi_v60l8256",name:"V60 Lite 8/256",rrp:9999},
+  {id:"vi_v60l12256",name:"V60 Lite 12/256",rrp:11999},
+  {id:"vi_v70fe8256",name:"V70FE 8/256",rrp:12999},
+  {id:"vi_v70fe12256",name:"V70FE 12/256",rrp:14999},
+  {id:"vi_v708256",name:"V70 8/256",rrp:17999},
+  {id:"vi_v7012256",name:"V70 12/256",rrp:19999},
+  {id:"vi_v70512",name:"V70 512",rrp:23999},
+  {id:"vi_x300fe256",name:"X300FE 256",rrp:27999},
+  {id:"vi_x300fe512",name:"X300FE 512",rrp:31999},
+  {id:"vi_x300_256",name:"X300 256",rrp:29999},
+  {id:"vi_x300_512",name:"X300 512",rrp:32999},
+  {id:"vi_x300pro",name:"X300 Pro",rrp:39999},
+  {id:"vi_x300ult512",name:"X300 ULT 512",rrp:54999},
+  {id:"vi_x300ult1tb",name:"X300 ULT 1Tb",rrp:64999},
+],
+Samsung:[
+  {id:"ss_a065g64",name:"A06 5G 64",rrp:3299},
+  {id:"ss_a0764",name:"A07 64",rrp:3299},
+  {id:"ss_a07128",name:"A07 128",rrp:5999},
+  {id:"ss_a16128",name:"A16 128",rrp:5999},
+  {id:"ss_a17128",name:"A17 128",rrp:7999},
+  {id:"ss_a17256",name:"A17 256",rrp:9299},
+  {id:"ss_a27128",name:"A27 128",rrp:10999},
+  {id:"ss_a37256",name:"A37 256",rrp:13999},
+  {id:"ss_a57256",name:"A57 256",rrp:17999},
+  {id:"ss_a57512",name:"A57 512",rrp:20999},
+  {id:"ss_s25fe128",name:"S25FE 128",rrp:22900},
+  {id:"ss_s25fe256",name:"S25FE 256",rrp:26900},
+  {id:"ss_s25ult256",name:"S25ULT 256",rrp:36900},
+  {id:"ss_s25ult512",name:"S25ULT 512",rrp:42900},
+  {id:"ss_s26_256",name:"S26 256",rrp:33900},
+  {id:"ss_s26_512",name:"S26 512",rrp:41900},
+  {id:"ss_s26p256",name:"S26+ 256",rrp:40900},
+  {id:"ss_s26p512",name:"S26+ 512",rrp:48900},
+  {id:"ss_s26ult256",name:"S26ULT 256",rrp:46900},
+  {id:"ss_s26ult512",name:"S26ULT 512",rrp:54900},
+  {id:"ss_s26ult1tb",name:"S26ULT 1Tb",rrp:66900},
+  {id:"ss_zflip7_256",name:"Z Flip7 256",rrp:40900},
+  {id:"ss_zflip7_512",name:"Z Flip7 512",rrp:45900},
+  {id:"ss_zfold7_256",name:"Z Fold7 256",rrp:67900},
+  {id:"ss_zfold7_512",name:"Z Fold7 512",rrp:75900},
+  {id:"ss_zfold7_1tb",name:"Z Fold7 1Tb",rrp:87900},
+],
+Xiaomi:[
+  {id:"mi_a7pro64",name:"A7Pro 64",rrp:3299},
+  {id:"mi_a7pro128",name:"A7Pro 128",rrp:3699},
+  {id:"mi_15c6128",name:"15C 6/128",rrp:3999},
+  {id:"mi_15c8256",name:"15C 8/256",rrp:4799},
+  {id:"mi_redmi154g",name:"Redmi15 4G",rrp:4999},
+  {id:"mi_redmi155g",name:"Redmi15 5G",rrp:5999},
+  {id:"mi_note154g",name:"Note15 4G",rrp:6699},
+  {id:"mi_note155g",name:"Note15 5G",rrp:8499},
+  {id:"mi_note15pro256",name:"Note15Pro 256",rrp:11990},
+  {id:"mi_note15pro512",name:"Note15Pro 512",rrp:14990},
+  {id:"mi_note15prop",name:"Note15Pro+",rrp:16990},
+  {id:"mi_17t256",name:"17T 256",rrp:19999},
+  {id:"mi_17t512",name:"17T 512",rrp:22999},
+  {id:"mi_17tpro256",name:"17T Pro 256",rrp:25999},
+  {id:"mi_17tpro512",name:"17T Pro 512",rrp:27999},
+  {id:"mi_17_512",name:"17 512",rrp:32990},
+  {id:"mi_17ult512",name:"17 ULT 512",rrp:44990},
+  {id:"mi_17ult1tb",name:"17 ULT 1Tb",rrp:48990},
+],
+Realme:[
+  {id:"rm_note7064",name:"Note70 64",rrp:3199},
+  {id:"rm_note8064",name:"Note80 64",rrp:3999},
+  {id:"rm_c85128",name:"C85 128",rrp:7999},
+  {id:"rm_c85256",name:"C85 256",rrp:8999},
+  {id:"rm_c100i128",name:"C100i 128",rrp:5499},
+  {id:"rm_c100x256",name:"C100X 256",rrp:6999},
+  {id:"rm_c1004128",name:"C100 4/128",rrp:6999},
+  {id:"rm_c1006128",name:"C100 6/128",rrp:7499},
+  {id:"rm_15t256",name:"15T 256",rrp:9999},
+  {id:"rm_15t512",name:"15T 512",rrp:11999},
+  {id:"rm_168256",name:"16 8/256",rrp:13999},
+  {id:"rm_16pro256",name:"16Pro 256",rrp:16999},
+  {id:"rm_16prop256",name:"16Pro+ 256",rrp:17499},
+  {id:"rm_16prop512",name:"16Pro+ 512",rrp:19999},
+  {id:"rm_gt7t256",name:"GT7T 256",rrp:17999},
+  {id:"rm_gt7512",name:"GT7 512",rrp:22999},
+  {id:"rm_gt6512",name:"GT6 512",rrp:24999},
+],
+Honor:[
+  {id:"hn_x5c128",name:"X5c 128",rrp:4499},
+  {id:"hn_x6c128",name:"X6c 128",rrp:4999},
+  {id:"hn_x6c256",name:"X6c 256",rrp:5999},
+  {id:"hn_x6d128",name:"X6d 128",rrp:5999},
+  {id:"hn_x7d4g",name:"X7d 4G",rrp:7499},
+  {id:"hn_x7d5g",name:"X7d 5G",rrp:8499},
+  {id:"hn_x9d256",name:"X9d 256",rrp:13999},
+  {id:"hn_600lite",name:"600Lite",rrp:13999},
+  {id:"hn_600_256",name:"600 256",rrp:19999},
+  {id:"hn_600pro",name:"600 Pro",rrp:29999},
+  {id:"hn_magic8pro",name:"Magic8 Pro",rrp:39990},
+  {id:"hn_magicv5",name:"Magic V5",rrp:57990},
+],
+Infinix:[
+  {id:"inf_smart2064",name:"Smart20 64",rrp:3299},
+  {id:"inf_smart20128",name:"Smart20 128",rrp:3699},
+  {id:"inf_hot60i256",name:"HOT60i 256",rrp:5199},
+  {id:"inf_hot704128",name:"HOT70 4/128",rrp:4999},
+  {id:"inf_hot706128",name:"HOT70 6/128",rrp:5999},
+  {id:"inf_noteedge",name:"Note EDGE",rrp:8499},
+  {id:"inf_note60pro8128",name:"Note60Pro 8/128",rrp:10999},
+  {id:"inf_note60pro12128",name:"Note60Pro 12/128",rrp:12999},
+  {id:"inf_gt50pro",name:"GT50Pro",rrp:15999},
+],
+Apple:[]
+};
+
+// ─── SHOP REGISTRY ────────────────────────────────────────────
+// Each shop has a STABLE internal id (used for Firebase path + local storage)
+// and a separate login "code" (password). Data is always keyed by the id,
+// never by the password — so changing a shop's password later does NOT
+// reset or disconnect its sales data. Each shop's data lives under a
+// completely separate Firebase node: shops/{id}/... so editing one shop
+// (prices, models, order) can NEVER affect another shop.
+// To disable a shop later, just delete/comment out its line — its data
+// stays intact in the database, only login is blocked.
+// To change a shop's password: edit the "code" value only, keep the id the same.
+const SHOPS = {
+  "bnn166":    {code:"TOEYBN166",    name:"Bnn166"},
+  "bnn167":    {code:"BUNGSUNBN167", name:"Bnn167"},
+  "bnn756":    {code:"MOOAUAN756",   name:"Bnn756"},
+  "itc242":    {code:"BASITC242",    name:"IT City 242"},
+  "itc242a":   {code:"OPPOITC242A",  name:"IT City 242A"},
+  "itcity":    {code:"POPITC0031",   name:"IT City"},
+  "jm1166":    {code:"PWJM1166",     name:"JM 1166"},
+  "jmiot":     {code:"MOOJMIOT",     name:"JM iot"},
+  "tg":        {code:"KOOKTG936495", name:"TG"},
+  "advice":    {code:"KAV022",       name:"Advice"},
+  "ais1107":   {code:"SOM1107",      name:"AIS 1107"},
+  "asp":       {code:"KTASP",        name:"ASP"},
+  "trueshop":  {code:"TTT1570",      name:"True Shop Fashion"},
+  "dtachall":  {code:"TWDTAC",       name:"Dtac Hall Fashion"}
+};
+// Reverse lookup: login code -> internal id
+function findShopIdByCode(code){
+  return Object.keys(SHOPS).find(id=>SHOPS[id].code===code) || null;
+}
+
+// ─── FIREBASE REALTIME DATABASE SYNC (compat SDK) ─────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDvGsnwHzbevN8Z4fXhZgCkQ1hkjEvD7-o",
+  authDomain: "tora-sales.firebaseapp.com",
+  databaseURL: "https://tora-sales-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "tora-sales",
+  storageBucket: "tora-sales.firebasestorage.app",
+  messagingSenderId: "703187338859",
+  appId: "1:703187338859:web:7aa7ffa0849180ed47932e"
+};
+if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let SHOP_ID = "";   // stable internal id — used for all data storage/paths
+let syncTimer = null;
+let unsubListener = null;
+let _pushing=false;
+
+let ST={ab:"OPPO",sb:"OPPO",ob:"OPPO",today:{},accum:{},rrp:{},order:{},customName:{},deleted:{},customModels:{},mk:MK};
+let HIST=[]; // {dateStr, notes:[str,...]} max 31
+
+function setDot(color, title){
+  const d=document.getElementById('syncDot');
+  if(d){d.style.background=color;if(title)d.title=title;}
+}
+function dbRef(){ return db.ref('shops/'+SHOP_ID+'/data'); }
+function histRef(){ return db.ref('shops/'+SHOP_ID+'/hist'); }
+
+function saveLocal(){
+  try{localStorage.setItem('tsr_'+SHOP_ID,JSON.stringify({mk:MK,today:ST.today,accum:ST.accum,rrp:ST.rrp,order:ST.order,customName:ST.customName,deleted:ST.deleted||{},customModels:ST.customModels||{}}));}catch(e){}
+  try{localStorage.setItem('tsr_hist_'+SHOP_ID,JSON.stringify(HIST.slice(-31)));}catch(e){}
+}
+function loadLocal(){
+  try{
+    const s=localStorage.getItem('tsr_'+SHOP_ID);
+    if(s){const p=JSON.parse(s);
+      ST.rrp=p.rrp||{};ST.order=p.order||{};ST.customName=p.customName||{};ST.deleted=p.deleted||{};ST.customModels=p.customModels||{};
+      if(p.mk===MK){ST.today=p.today||{};ST.accum=p.accum||{};}
+      else{ST.today={};ST.accum={};}
+    }
+  }catch(e){}
+  try{const h=localStorage.getItem('tsr_hist_'+SHOP_ID);if(h)HIST=JSON.parse(h);}catch(e){}
+}
+function applyCloud(p){
+  if(!p)return;
+  ST.rrp=p.rrp||{};ST.order=p.order||{};ST.customName=p.customName||{};ST.deleted=p.deleted||{};ST.customModels=p.customModels||{};
+  if(p.mk===MK){ST.today=p.today||{};ST.accum=p.accum||{};}
+  else{ST.today={};ST.accum={};}
+}
+function pushCloud(){
+  if(!SHOP_ID)return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>{
+    setDot('#ffcc4d','กำลัง sync...');
+    _pushing=true;
+    const payload={today:ST.today,accum:ST.accum,rrp:ST.rrp,order:ST.order,
+      customName:ST.customName,deleted:ST.deleted||{},customModels:ST.customModels||{},mk:MK,ts:Date.now()};
+    dbRef().set(payload)
+      .then(()=>{ setDot('#3ddc97','Synced ✓'); setTimeout(()=>{_pushing=false;},500); })
+      .catch(()=>{ setDot('#ff5c6c','Sync failed'); _pushing=false; });
+  },800);
+}
+function subscribeRealtime(){
+  if(unsubListener){unsubListener();unsubListener=null;}
+  unsubListener=dbRef().on('value', snap=>{
+    if(_pushing)return;
+    const p=snap.val();
+    if(p){applyCloud(p);saveLocal();renderMain();setDot('#3ddc97','Synced ✓');}
+  }, ()=>setDot('#ff5c6c','ไม่มีสัญญาณ'));
+}
+function save(){ saveLocal(); pushCloud(); }
+function saveHist(){ saveLocal(); pushCloud(); histRef().set(HIST.slice(-31)).catch(()=>{}); }
+
+function doLogin(){
+  const code=(document.getElementById('shopCodeInput').value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(!code){ document.getElementById('loginStatus').textContent='⚠️ กรุณาใส่รหัสร้าน'; return; }
+  const shopId=findShopIdByCode(code);
+  if(!shopId){ document.getElementById('loginStatus').innerHTML='<span style="color:var(--danger)">❌ รหัสร้านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง</span>'; return; }
+  const shopName=SHOPS[shopId].name;
+  document.getElementById('loginStatus').innerHTML='<span style="color:#ffcc4d">⏳ กำลังเชื่อมต่อ...</span>';
+  SHOP_ID=shopId;
+  localStorage.setItem('tsr_lastcode',code);
+  loadLocal();
+  Object.keys(RAW).forEach(b=>{if(RAW[b].length)RAW[b].sort((a,b)=>a.rrp-b.rrp);});
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));
+  document.getElementById('screen-main').classList.add('act');
+  document.getElementById('shopNameTitle').textContent=shopName;
+  document.getElementById('creditLine').textContent='Made with ❤️ by Tora · '+shopName;
+  renderMain();
+  setDot('#ffcc4d','กำลังเชื่อมต่อ...');
+  dbRef().once('value').then(snap=>{
+    if(snap.exists()){applyCloud(snap.val());saveLocal();renderMain();}
+    return histRef().once('value');
+  }).then(snap=>{
+    if(snap&&snap.exists())HIST=snap.val()||[];
+    setDot('#3ddc97','Synced ✓');
+    subscribeRealtime();
+  }).catch(()=>{
+    setDot('#ff5c6c','ออฟไลน์ — ใช้ข้อมูลในเครื่อง');
+  });
+}
+function doLogout(){
+  if(!confirm("ออกจากระบบเพื่อเปลี่ยนรหัสร้าน?\n(ข้อมูลในเครื่องจะยังอยู่ครบ กลับมาใส่รหัสเดิมได้ตลอด)"))return;
+  if(unsubListener){unsubListener();unsubListener=null;}
+  SHOP_ID="";
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));
+  document.getElementById('screen-login').classList.add('act');
+}
+function load(){
+  const savedCode=localStorage.getItem('tsr_lastcode');
+  if(savedCode&&findShopIdByCode(savedCode)){
+    document.getElementById('shopCodeInput').value=savedCode;
+    setTimeout(doLogin,200);
+  }
+}
+
+// ─── MODEL HELPERS (respect per-shop order + deleted list + custom models) ────
+function models(b){
+  const raw=[...(RAW[b]||[]),...((ST.customModels&&ST.customModels[b])||[])];
+  const del=(ST.deleted&&ST.deleted[b])||[];
+  const filtered=del.length?raw.filter(m=>!del.includes(m.id)):raw;
+  const ord=ST.order[b];
+  if(!ord)return filtered;
+  const mp=Object.fromEntries(filtered.map(m=>[m.id,m]));
+  return [...ord.map(id=>mp[id]).filter(Boolean),...filtered.filter(m=>!ord.includes(m.id))];
+}
+function rrp(id){
+  if(ST.rrp[id]!==undefined)return ST.rrp[id];
+  for(const b of Object.keys(RAW)){const m=RAW[b].find(x=>x.id===id);if(m)return m.rrp;}
+  for(const b of Object.keys(ST.customModels||{})){const m=ST.customModels[b].find(x=>x.id===id);if(m)return m.rrp;}
+  return 0;
+}
+function tq(id){return ST.today[id]||0;}
+function mq(id){return(ST.accum[id]||0)+tq(id);}
+function bTQ(b){ if(b==="Apple")return tq('apple_total'); return models(b).reduce((s,m)=>s+tq(m.id),0); }
+function bMQ(b){ if(b==="Apple")return mq('apple_total'); return models(b).reduce((s,m)=>s+mq(m.id),0); }
+function bTR(b){ if(b==="Apple")return 0; return models(b).reduce((s,m)=>s+tq(m.id)*rrp(m.id),0); }
+function bMR(b){ if(b==="Apple")return 0; return models(b).reduce((s,m)=>s+mq(m.id)*rrp(m.id),0); }
+function allTQ(){return BRANDS.reduce((s,b)=>s+bTQ(b),0);}
+function allMQ(){return BRANDS.reduce((s,b)=>s+bMQ(b),0);}
+function pct(a,t){return t?((a/t)*100).toFixed(2):"0.00";}
+function fmt(n){return Math.round(n).toLocaleString('th-TH');}
+
+function fmtDate(d){
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  const be=d.getFullYear()+543;
+  const yy=String(be).slice(-2);
+  return `${dd}/${mm}/${yy}`;
+}
+function mthName(d){
+  const m=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  return m[d.getMonth()]+" "+String(d.getFullYear()+543).slice(-2);
+}
+
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));document.getElementById(id).classList.add('act');}
+function goMain(){showScreen('screen-main');renderMain();}
+function goSettings(){ST.sb="OPPO";showScreen('screen-settings');renderSettingsTabs();renderSettings();}
+function goSort(){ST.ob="OPPO";showScreen('screen-sort');renderSortTabs();renderSort();}
+function goHistory(){showScreen('screen-history');renderHistory();}
+
+function renderMain(){
+  const shopName=(SHOPS[SHOP_ID]&&SHOPS[SHOP_ID].name)||'Sale Report';
+  document.getElementById('shopNameTitle').textContent=shopName;
+  document.getElementById('topDate').textContent=fmtDate(NOW)+" | "+mthName(NOW);
+  document.getElementById('todayN').textContent=allTQ();
+  document.getElementById('monthN').textContent=allMQ();
+  document.getElementById('mthLabel').textContent=mthName(NOW);
+  renderBrandTabs('brandTabs',ST.ab,'switchBrand',false);
+  renderModels();
+}
+function switchBrand(b){ST.ab=b;renderMain();}
+
+function renderBrandTabs(cid,active,fn,scrollable){
+  const el=document.getElementById(cid);
+  if(scrollable){
+    el.innerHTML=BRANDS.map(b=>`<button class="btab" style="flex-shrink:0;border-radius:20px;${b===active?'background:var(--accent);color:#fff;border-color:var(--accent)':''}" onclick="${fn}('${b}')">${b}</button>`).join('');
+  } else {
+    el.innerHTML=BRANDS.map(b=>{
+      const cnt=bTQ(b);
+      return `<button class="btab ${b===active?'act':''}" onclick="${fn}('${b}')">${b}<span class="bc">${cnt>0?cnt:''}</span></button>`;
+    }).join('');
+  }
+}
+
+function renderModels(){
+  const b=ST.ab;const el=document.getElementById('modelList');
+  if(b==="Apple"){
+    el.innerHTML=`<div style="background:var(--card);border:1px solid var(--line);border-radius:13px;padding:20px 16px;">
+      <div style="font-size:13px;color:var(--sub);text-align:center;margin-bottom:6px;">จำนวน Apple ที่ขายวันนี้</div>
+      <div class="big-count">
+        <button class="big-btn" onclick="chg('apple_total',-1);renderMain()">−</button>
+        <div class="big-count-num">${tq('apple_total')}</div>
+        <button class="big-btn" onclick="chg('apple_total',1);renderMain()">+</button>
+      </div>
+      <div style="text-align:center;font-size:11.5px;color:var(--sub);margin-top:6px;">สะสมเดือนนี้: ${mq('apple_total')} เครื่อง</div>
+    </div>`;
+    return;
+  }
+  const ms=models(b);
+  el.innerHTML=ms.map(m=>`<div class="model-card ${tq(m.id)>0?'sel':''}">
+    <div class="model-info">
+      <div class="model-name">${ST.customName[m.id]||m.name}</div>
+      <div class="model-sub">฿${rrp(m.id).toLocaleString()} · เดือน: ${mq(m.id)} เครื่อง</div>
+    </div>
+    <div class="stepper">
+      <button class="sb" onclick="chg('${m.id}',-1);renderMain()">−</button>
+      <span class="sc ${tq(m.id)===0?'zero':''}">${tq(m.id)||'·'}</span>
+      <button class="sb" onclick="chg('${m.id}',1);renderMain()">+</button>
+    </div>
+  </div>`).join('');
+}
+
+function chg(id,d){
+  const nv=Math.max(0,(ST.today[id]||0)+d);
+  if(nv===0)delete ST.today[id];else ST.today[id]=nv;
+  save();
+}
+
+function resetToday(){
+  if(!confirm("รีเซ็ตยอดขายวันนี้ทั้งหมด?\n(ยอดสะสมเดือนจะไม่หาย)"))return;
+  ST.today={};save();
+  document.getElementById('reportSection').style.display='none';
+  renderMain();
+}
+
+function buildModelLines(b){
+  if(b==="Apple")return[];
+  return models(b).filter(m=>mq(m.id)>0).map(m=>`${ST.customName[m.id]||m.name} = ${tq(m.id)}/${mq(m.id)}`);
+}
+
+// Builds report notes, packing model breakdowns into as many notes as needed
+// (each capped at 1000 chars) — works for any number/size of brands.
+function buildNotes(){
+  const aTQ=allTQ(),aMQ=allMQ();
+  const shopName=(SHOPS[SHOP_ID]&&SHOPS[SHOP_ID].name)||'Shop';
+  let n1=[fmtDate(NOW),`Shop : ${shopName}`,"Sale Volume",`All Brand ${aTQ}/${aMQ}`];
+  BRANDS.forEach(b=>n1.push(`${b} = ${bTQ(b)}/${bMQ(b)}/${aMQ}/${pct(bMQ(b),aMQ)}% Pc ${PC_DEF[b]}`));
+  n1.push("ยอดเงิน");
+  BRANDS.filter(b=>b!=="Apple").forEach(b=>n1.push(`${BSHORT[b]} = ${fmt(bTR(b))} / ${fmt(bMR(b))}`));
+  n1.push("Feedback ปัญหารายวัน","1.","2.","3.");
+  const noteFirst=n1.join("\n");
+
+  const blockBrands=BRANDS.filter(b=>b!=="Apple");
+  const rawBlocks=blockBrands.map(b=>[`${b} = ${bTQ(b)}/${bMQ(b)}`,...buildModelLines(b)].join("\n"));
+
+  const notes=[noteFirst];
+  let cur="";
+  rawBlocks.forEach(block=>{
+    const candidate=cur?cur+"\n───\n"+block:block;
+    if(candidate.length>1000 && cur){
+      notes.push(cur);
+      cur=block;
+    } else {
+      cur=candidate;
+    }
+  });
+  if(cur)notes.push(cur);
+  return notes;
+}
+
+function doGenerate(){
+  const oTQ=bTQ("OPPO"),vTQ=bTQ("Vivo");
+  const oTR=bTR("OPPO"),vTR=bTR("Vivo");
+  const notes=buildNotes();
+
+  const dateStr=fmtDate(NOW);
+  const existing=HIST.findIndex(h=>h.dateStr===dateStr);
+  if(existing>=0)HIST[existing]={dateStr,notes};
+  else HIST.push({dateStr,notes});
+  if(HIST.length>31)HIST=HIST.slice(-31);
+  saveHist();
+
+  renderReportSection(notes);
+
+  const isNoBill=oTQ===0;
+  const isWin=oTQ>0&&oTQ>vTQ&&oTR>vTR;
+  if(isNoBill){showOverlay(NO_BILL[Math.floor(Math.random()*NO_BILL.length)],false);}
+  else if(isWin){showOverlay(WIN_MSG[Math.floor(Math.random()*WIN_MSG.length)],true);}
+  else{
+    const diff=oTR-vTR;const sign=diff>=0?"นำ Vivo อยู่":"ตาม Vivo อยู่";
+    showOverlay(`OPPO ${sign} ฿${fmt(Math.abs(diff))}\nวันนี้ OPPO ${oTQ} | Vivo ${vTQ} เครื่อง`,false);
+  }
+  setTimeout(()=>document.getElementById('reportSection')?.scrollIntoView({behavior:'smooth'}),300);
+}
+
+function renderReportSection(notes){
+  const sec=document.getElementById('reportSection');
+  sec.style.display='block';
+  sec.innerHTML=notes.map((txt,i)=>{
+    const len=txt.length;const ok=len<=1000;
+    const label=i===0?"NOTE 1 — Daily Summary":`NOTE ${i+1} — Model Breakdown`;
+    return `<div class="report-block">
+      <div class="report-head">
+        <span>${label}</span>
+        <span class="char-count ${ok?'char-ok':'char-warn'}">${len}/1000 ${ok?'✓':'⚠'}</span>
+      </div>
+      <div class="report-pre" id="rt${i}">${txt.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>
+      <button class="copy-btn" id="cb${i}" onclick="copyNote(${i},'rt${i}','cb${i}')">📋 Copy ${i+1}</button>
+    </div>`;
+  }).join('');
+}
+
+function copyNote(i,preId,btnId){
+  const txt=document.getElementById(preId).textContent;
+  const btn=document.getElementById(btnId);
+  const label=`📋 Copy ${i+1}`;
+  const doCopy=()=>{if(btn){btn.textContent='✅ Copied!';btn.classList.add('done');setTimeout(()=>{btn.textContent=label;btn.classList.remove('done');},1800);}};
+  navigator.clipboard.writeText(txt).then(doCopy).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);doCopy();
+  });
+}
+
+let ovTimer=null;
+function showOverlay(msg,rainbow){
+  const ov=document.getElementById('overlay');const om=document.getElementById('ovMsg');
+  om.textContent=msg;om.className='ov-box'+(rainbow?' rainbow-text':'');
+  ov.classList.add('show');if(ovTimer)clearTimeout(ovTimer);
+  ovTimer=setTimeout(()=>ov.classList.remove('show'),3200);
+}
+document.getElementById('overlay').addEventListener('click',()=>document.getElementById('overlay').classList.remove('show'));
+
+// HISTORY SCREEN
+let openHist=null;
+function renderHistory(){
+  const el=document.getElementById('histList');
+  if(!HIST.length){el.innerHTML=`<div style="text-align:center;color:var(--sub);padding:40px 0;font-size:13px;">ยังไม่มีประวัติ<br>กด FINISH!! เพื่อบันทึกรีพอร์ทวันนี้</div>`;return;}
+  const sorted=[...HIST].reverse();
+  el.innerHTML=sorted.map(h=>{
+    const isOpen=openHist===h.dateStr;
+    const totalSold=h.notes[0].split('\n').find(l=>l.startsWith('All Brand'))||'';
+    return `<div class="hist-day">
+      <div class="hist-head" onclick="toggleHist('${h.dateStr}')">
+        <div class="hist-head-left">📅 ${h.dateStr}</div>
+        <div class="hist-head-right">${totalSold} ${isOpen?'▲':'▼'}</div>
+      </div>
+      ${isOpen?`<div class="hist-body">${h.notes.map((txt,ni)=>`
+        <div style="margin-bottom:10px;">
+          <div style="font-size:11px;color:var(--accent2);margin-bottom:4px;font-weight:600;">โน้ตที่ ${ni+1}</div>
+          <pre>${txt.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre>
+          <button class="copy-btn" style="margin:6px 0 0;width:100%;" id="hcb_${h.dateStr}_${ni}" onclick="copyHistNote('${h.dateStr}',${ni})">📋 คัดลอก</button>
+        </div>`).join('<hr style="border-color:var(--line);margin:10px 0;">')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+function toggleHist(ds){openHist=openHist===ds?null:ds;renderHistory();}
+function copyHistNote(ds,ni){
+  const h=HIST.find(x=>x.dateStr===ds);if(!h)return;
+  const txt=h.notes[ni];
+  const btnId=`hcb_${ds}_${ni}`;const btn=document.getElementById(btnId);
+  const doCopy=()=>{if(btn){btn.textContent='✅ คัดลอกแล้ว!';btn.classList.add('done');setTimeout(()=>{btn.textContent='📋 คัดลอก';btn.classList.remove('done');},1800);}};
+  navigator.clipboard.writeText(txt).then(doCopy).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);doCopy();
+  });
+}
+
+// SETTINGS
+function switchSettingsBrand(b){ST.sb=b;renderSettingsTabs();renderSettings();}
+function renderSettingsTabs(){renderBrandTabs('settingsTabs',ST.sb,'switchSettingsBrand',true);}
+function renderSettings(){
+  const b=ST.sb;const ms=models(b);
+  const listHTML=ms.map(m=>`
+    <div class="si" style="flex-direction:column;align-items:stretch;gap:6px;" id="sirow_${m.id}">
+      <div style="display:flex;gap:7px;align-items:center;">
+        <input type="text" class="si-inp" id="sn_${m.id}" value="${ST.customName[m.id]||m.name}" style="flex:1;width:auto;text-align:left;font-size:13px;">
+        <input type="number" class="si-inp" id="si_${m.id}" value="${rrp(m.id)}" min="0" step="100" style="width:88px;font-size:13px;">
+        <button onclick="deleteModel('${b}','${m.id}')" style="width:30px;height:34px;border-radius:8px;border:1px solid var(--danger);background:transparent;color:var(--danger);font-size:16px;cursor:pointer;flex-shrink:0;">✕</button>
+      </div>
+      <div style="font-size:10px;color:var(--sub);">ชื่อรุ่น · ราคา RRP (บาท) · ลบ</div>
+    </div>`).join('');
+  document.getElementById('settingsList').innerHTML=`
+    <div style="font-size:11.5px;color:var(--sub);padding:0 2px 8px;">แตะชื่อเพื่อแก้ · กด ✕ เพื่อลบรุ่น</div>
+    ${listHTML}
+    <div style="background:var(--card);border:1px dashed var(--accent2);border-radius:12px;padding:12px 13px;margin-top:4px;">
+      <div style="font-size:12px;color:var(--accent2);font-weight:600;margin-bottom:8px;">+ เพิ่มรุ่นใหม่</div>
+      <div style="display:flex;gap:7px;align-items:center;">
+        <input type="text" id="newModelName" placeholder="ชื่อรุ่น เช่น A9 Pro 8/256" class="si-inp" style="flex:1;width:auto;text-align:left;font-size:13px;">
+        <input type="number" id="newModelRRP" placeholder="ราคา" class="si-inp" min="0" step="100" style="width:88px;font-size:13px;">
+      </div>
+      <button onclick="addNewModel('${b}')" style="margin-top:8px;width:100%;padding:9px;border-radius:9px;border:none;background:var(--accent2);color:#0d2a1f;font-weight:700;font-size:13px;cursor:pointer;">เพิ่มรุ่นนี้เข้ารายการ</button>
+    </div>`;
+}
+function saveSettings(){
+  const b=ST.sb;
+  models(b).forEach(m=>{
+    const ne=document.getElementById('sn_'+m.id);
+    const re=document.getElementById('si_'+m.id);
+    if(ne&&ne.value.trim())ST.customName[m.id]=ne.value.trim();
+    if(re)ST.rrp[m.id]=parseInt(re.value)||0;
+  });
+  save();showOverlay("บันทึกแล้ว ✓",false);
+}
+function deleteModel(brand,id){
+  if(!confirm("ลบรุ่นนี้ออกจากรายการ?"))return;
+  if(!ST.deleted)ST.deleted={};
+  if(!ST.deleted[brand])ST.deleted[brand]=[];
+  if(!ST.deleted[brand].includes(id))ST.deleted[brand].push(id);
+  if(ST.order[brand])ST.order[brand]=ST.order[brand].filter(x=>x!==id);
+  delete ST.today[id];delete ST.accum[id];
+  save();renderSettings();renderMain();
+  showOverlay("ลบรุ่นแล้ว",false);
+}
+function addNewModel(brand){
+  const nameEl=document.getElementById('newModelName');
+  const rrpEl=document.getElementById('newModelRRP');
+  const name=(nameEl.value||'').trim();
+  const price=parseInt(rrpEl.value)||0;
+  if(!name){showOverlay("กรุณาใส่ชื่อรุ่นก่อนนะ 🙏",false);return;}
+  const id='custom_'+Date.now();
+  if(!ST.customModels)ST.customModels={};
+  if(!ST.customModels[brand])ST.customModels[brand]=[];
+  ST.customModels[brand].push({id,name,rrp:price});
+  save();renderSettings();renderMain();
+  showOverlay(`เพิ่ม "${name}" แล้ว ✓`,false);
+}
+
+// SORT
+function switchSortBrand(b){ST.ob=b;renderSortTabs();renderSort();}
+function renderSortTabs(){renderBrandTabs('sortTabs',ST.ob,'switchSortBrand',true);}
+function renderSort(){
+  const ms=models(ST.ob);
+  const sl=document.getElementById('sortList');
+  sl.innerHTML=ms.map(m=>`<div class="sort-card" draggable="true" data-id="${m.id}">
+    <span style="font-size:18px;color:var(--sub);cursor:grab;">☰</span>
+    <div style="flex:1;"><div style="font-size:13.5px;font-weight:600;">${ST.customName[m.id]||m.name}</div>
+    <div style="font-size:11px;color:var(--sub);">฿${rrp(m.id).toLocaleString()}</div></div>
+  </div>`).join('');
+  setupDrag(sl);
+}
+function setupDrag(container){
+  let dragEl=null;
+  container.querySelectorAll('[draggable]').forEach(el=>{
+    el.addEventListener('dragstart',e=>{dragEl=el;e.dataTransfer.effectAllowed='move';el.style.opacity='.4';});
+    el.addEventListener('dragend',()=>{dragEl=null;el.style.opacity='';container.querySelectorAll('.drag-target').forEach(x=>x.classList.remove('drag-target'));});
+    el.addEventListener('dragover',e=>{e.preventDefault();if(dragEl&&dragEl!==el){el.classList.add('drag-target');container.insertBefore(dragEl,el.nextSibling&&el.nextSibling!==dragEl?el.nextSibling:el);}});
+    el.addEventListener('dragleave',()=>el.classList.remove('drag-target'));
+    el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('drag-target');});
+    let touchY=0;
+    el.addEventListener('touchstart',e=>{touchY=e.touches[0].clientY;el.style.background='var(--card2)';},{passive:true});
+    el.addEventListener('touchmove',e=>{
+      const ty=e.touches[0].clientY;
+      const items=[...container.querySelectorAll('[draggable]')];
+      const target=items.find(it=>{const r=it.getBoundingClientRect();return ty>=r.top&&ty<=r.bottom&&it!==el;});
+      if(target)container.insertBefore(el,ty<target.getBoundingClientRect().top+target.offsetHeight/2?target:target.nextSibling);
+    },{passive:true});
+    el.addEventListener('touchend',()=>el.style.background='');
+  });
+}
+function saveSortAndBack(){
+  ST.order[ST.ob]=[...document.getElementById('sortList').querySelectorAll('[data-id]')].map(r=>r.dataset.id);
+  save();goMain();
+}
+
+function saveAndClose(){
+  const hasData=Object.keys(ST.today).some(k=>ST.today[k]>0);
+  if(!hasData){showOverlay("ยังไม่มียอดขายวันนี้ 🤔",false);return;}
+  if(!confirm("บันทึกยอดวันนี้เข้าสะสมเดือน และล้างยอดวันนี้เป็น 0 ใช่ไหม?"))return;
+  for(const id in ST.today){ST.accum[id]=(ST.accum[id]||0)+(ST.today[id]||0);}
+  ST.today={};save();
+  document.getElementById('reportSection').style.display='none';
+  renderMain();
+  setTimeout(()=>showOverlay("✅ บันทึกสำเร็จแล้ว",false),50);
+}
+
+load();
+</script>
+</body>
+</html>
