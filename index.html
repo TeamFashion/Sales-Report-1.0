@@ -70,8 +70,10 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .si-inp{background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:7px 10px;font-size:13px;width:100px;text-align:right;}
 .si-inp:focus{border-color:var(--accent);outline:none;}
 .sort-hint{font-size:12px;color:var(--sub);padding:8px 2px 10px;}
-.sort-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:7px;touch-action:none;}
+.sort-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:7px;touch-action:pan-y;transition:transform .15s,box-shadow .15s;}
 .sort-card.drag-target{border-color:var(--accent);border-style:dashed;}
+.sort-card.dragging{transform:scale(1.03);box-shadow:0 10px 24px rgba(0,0,0,.45);border-color:var(--accent);position:relative;z-index:5;}
+.drag-handle{touch-action:none;cursor:grab;}
 .hist-day{background:var(--card);border:1px solid var(--line);border-radius:13px;margin-bottom:10px;overflow:hidden;}
 .hist-head{padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
 .hist-head-left{font-size:13.5px;font-weight:600;}
@@ -84,6 +86,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .ov-box.rainbow-text{animation:rb 1s linear infinite;}
 @keyframes rb{0%{color:#e63323}16%{color:#ff9500}32%{color:#ffcc4d}48%{color:#3ddc97}64%{color:#5ac8fa}80%{color:#a78bfa}100%{color:#e63323}}
 .credit{text-align:center;font-size:11px;color:#3a3f4a;padding:6px 0 4px;margin-top:8px;}
+#saveBtn.pulse-save{animation:pulseSave 1.1s ease-in-out infinite;}
+@keyframes pulseSave{0%{box-shadow:0 0 0 0 rgba(255,204,77,.55);}70%{box-shadow:0 0 0 10px rgba(255,204,77,0);}100%{box-shadow:0 0 0 0 rgba(255,204,77,0);}}
 </style>
 </head>
 <body>
@@ -126,13 +130,16 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <div class="brand-tabs" id="brandTabs"></div>
     <div class="model-list" id="modelList"></div>
     <div id="reportSection" class="report-section" style="display:none;"></div>
+    <div id="saveReminder" style="display:none;margin-top:4px;background:#2a2410;border:1px solid #ffcc4d;color:#ffcc4d;border-radius:12px;padding:12px 14px;font-size:13px;text-align:center;font-weight:700;">
+      ⚠ อย่าลืมกด <b>Save</b> ด้านล่าง เพื่อบันทึกยอดวันนี้เข้าสะสมเดือน!
+    </div>
     <div class="credit" id="creditLine">Made with ❤️ by Tora</div>
   </div>
 
   <div class="footer-bar">
     <button class="btn-reset" onclick="resetToday()">รีเซ็ต</button>
     <button class="btn-go" onclick="doGenerate()" style="flex:1.4;">FINISH!!</button>
-    <button class="btn-go" onclick="saveAndClose()" style="flex:0 0 auto;background:#1a6644;font-size:13.5px;padding:13px 16px;font-weight:900;letter-spacing:.5px;">Save</button>
+    <button class="btn-go" id="saveBtn" onclick="saveAndClose()" style="flex:0 0 auto;background:#1a6644;font-size:13.5px;padding:13px 16px;font-weight:900;letter-spacing:.5px;">Save</button>
   </div>
 </div>
 
@@ -199,6 +206,29 @@ const MK=NOW.getFullYear()+"-"+NOW.getMonth();
 // ─── BRAND CONFIG ──────────────────────────────────────────────
 const BRANDS=["OPPO","Vivo","Samsung","Xiaomi","Realme","Honor","Infinix","Apple"];
 const PC_DEF={OPPO:2,Vivo:2,Samsung:2,Xiaomi:1,Realme:1,Honor:1,Infinix:1,Apple:1};
+// Per-shop Pc override (falls back to PC_DEF above if a shop/brand isn't listed).
+// Key = internal shop id (matches SHOPS above). Apple = "iPhone" column.
+const PC_BY_SHOP={
+  bnn166:   {OPPO:1,Vivo:2,Samsung:1,Xiaomi:1,Realme:0,Honor:0,Infinix:0,Apple:2},
+  bnn167:   {OPPO:2,Vivo:2,Samsung:1,Xiaomi:1,Realme:1,Honor:1,Infinix:1,Apple:1},
+  bnn756:   {OPPO:2,Vivo:2,Samsung:1,Xiaomi:2,Realme:1,Honor:1,Infinix:1,Apple:1},
+  itc242:   {OPPO:2,Vivo:2,Samsung:1,Xiaomi:2,Realme:1,Honor:1,Infinix:1,Apple:1},
+  itc242a:  {OPPO:1,Vivo:1,Samsung:1,Xiaomi:1,Realme:1,Honor:0,Infinix:0,Apple:0},
+  itcity:   {OPPO:1,Vivo:1,Samsung:1,Xiaomi:1,Realme:1,Honor:1,Infinix:1,Apple:1},
+  jm1166:   {OPPO:3,Vivo:2,Samsung:1,Xiaomi:2,Realme:1,Honor:0,Infinix:1,Apple:1},
+  jmiot:    {OPPO:1,Vivo:1,Samsung:1,Xiaomi:1,Realme:1,Honor:1,Infinix:1,Apple:1},
+  tg:       {OPPO:1,Vivo:0,Samsung:1,Xiaomi:1,Realme:1,Honor:1,Infinix:0,Apple:0},
+  advice:   {OPPO:1,Vivo:1,Samsung:0,Xiaomi:0,Realme:0,Honor:0,Infinix:0,Apple:1},
+  ais1107:  {OPPO:2,Vivo:2,Samsung:2,Xiaomi:2,Realme:1,Honor:1,Infinix:1,Apple:2},
+  asp:      {OPPO:1,Vivo:1,Samsung:2,Xiaomi:2,Realme:0,Honor:1,Infinix:0,Apple:1},
+  trueshop: {OPPO:2,Vivo:2,Samsung:1,Xiaomi:1,Realme:1,Honor:1,Infinix:1,Apple:1},
+  dtachall: {OPPO:2,Vivo:2,Samsung:1,Xiaomi:1,Realme:1,Honor:1,Infinix:0,Apple:1}
+};
+function pcFor(b){
+  const m=PC_BY_SHOP[SHOP_ID];
+  if(m && m[b]!==undefined) return m[b];
+  return PC_DEF[b]!==undefined?PC_DEF[b]:0;
+}
 const BSHORT={OPPO:"O",Vivo:"V",Samsung:"S",Xiaomi:"Mi",Realme:"R",Honor:"Hn",Infinix:"Inf"};
 const NO_BILL=["ไม่เป็นไร พรุ่งนี้เอาใหม่ 💪","Rest Day วันนี้ พรุ่งนี้ลุยใหม่ 🔥","แค่วันนี้วันเดียว พรุ่งนี้ OPPO คืนชีพ!","บางวันก็เป็นแบบนี้ สู้ต่อเลย 🐯","วันนี้หยุดพักก็ได้ — พรุ่งนี้แก้แค้น!","OPPO ยังรักคุณอยู่แม้วันนี้ไม่มีบิล 🙏","ทุกคนมีวันแบบนี้ อย่าท้อนะ!"];
 const WIN_MSG=["OPPO ชนะทุกมิติ! ราชาแห่ง Shop! 🏆","วันนี้ OPPO เหนือกว่าทุกราง! 🔥","Vivo แพ้แล้ว! OPPO ยิ่งใหญ่ที่สุด! 👑","Champion ประจำวัน — ไม่มีใครกั้น OPPO! 🐯","OPPO โกยทั้งเงินและเครื่องวันนี้! 💰","เจ้าของ Shop วันนี้คือ OPPO ไม่มีเถียง! 🎯","No.1 วันนี้ขอยกให้ OPPO เต็มๆ! 🌟","OPPO ปราบ Vivo ได้สวยงามมาก! 🔴"];
@@ -621,6 +651,8 @@ function resetToday(){
   if(!confirm("รีเซ็ตยอดขายวันนี้ทั้งหมด?\n(ยอดสะสมเดือนจะไม่หาย)"))return;
   ST.today={};save();
   document.getElementById('reportSection').style.display='none';
+  document.getElementById('saveReminder').style.display='none';
+  document.getElementById('saveBtn').classList.remove('pulse-save');
   renderMain();
 }
 
@@ -635,7 +667,7 @@ function buildNotes(){
   const aTQ=allTQ(),aMQ=allMQ();
   const shopName=(SHOPS[SHOP_ID]&&SHOPS[SHOP_ID].name)||'Shop';
   let n1=[fmtDate(NOW),`Shop : ${shopName}`,"Sale Volume",`All Brand ${aTQ}/${aMQ}`];
-  BRANDS.forEach(b=>n1.push(`${b} = ${bTQ(b)}/${bMQ(b)}/${aMQ}/${pct(bMQ(b),aMQ)}% Pc ${PC_DEF[b]}`));
+  BRANDS.forEach(b=>n1.push(`${b} = ${bTQ(b)}/${bMQ(b)}/${aMQ}/${pct(bMQ(b),aMQ)}% Pc ${pcFor(b)}`));
   n1.push("ยอดเงิน");
   BRANDS.filter(b=>b!=="Apple").forEach(b=>n1.push(`${BSHORT[b]} = ${fmt(bTR(b))} / ${fmt(bMR(b))}`));
   n1.push("Feedback ปัญหารายวัน","1.","2.","3.");
@@ -672,6 +704,8 @@ function doGenerate(){
   saveHist();
 
   renderReportSection(notes);
+  document.getElementById('saveReminder').style.display='block';
+  document.getElementById('saveBtn').classList.add('pulse-save');
 
   const isNoBill=oTQ===0;
   const isWin=oTQ>0&&oTQ>vTQ&&oTR>vTR;
@@ -821,7 +855,7 @@ function renderSort(){
   const ms=models(ST.ob);
   const sl=document.getElementById('sortList');
   sl.innerHTML=ms.map(m=>`<div class="sort-card" draggable="true" data-id="${m.id}">
-    <span style="font-size:18px;color:var(--sub);cursor:grab;">☰</span>
+    <span class="drag-handle" style="font-size:18px;color:var(--sub);">☰</span>
     <div style="flex:1;"><div style="font-size:13.5px;font-weight:600;">${ST.customName[m.id]||m.name}</div>
     <div style="font-size:11px;color:var(--sub);">฿${rrp(m.id).toLocaleString()}</div></div>
   </div>`).join('');
@@ -830,20 +864,43 @@ function renderSort(){
 function setupDrag(container){
   let dragEl=null;
   container.querySelectorAll('[draggable]').forEach(el=>{
-    el.addEventListener('dragstart',e=>{dragEl=el;e.dataTransfer.effectAllowed='move';el.style.opacity='.4';});
-    el.addEventListener('dragend',()=>{dragEl=null;el.style.opacity='';container.querySelectorAll('.drag-target').forEach(x=>x.classList.remove('drag-target'));});
+    const handle=el.querySelector('.drag-handle');
+    let desktopDragAllowed=false;
+    let touchActive=false;
+
+    // Desktop: only allow the native HTML5 drag to start when the mousedown
+    // originated on the ☰ handle — tapping/scrolling elsewhere on the card
+    // no longer triggers a drag.
+    if(handle) handle.addEventListener('mousedown',()=>{desktopDragAllowed=true;});
+    el.addEventListener('dragstart',e=>{
+      if(!desktopDragAllowed){e.preventDefault();return;}
+      dragEl=el;e.dataTransfer.effectAllowed='move';el.classList.add('dragging');
+    });
+    el.addEventListener('dragend',()=>{
+      dragEl=null;desktopDragAllowed=false;el.classList.remove('dragging');
+      container.querySelectorAll('.drag-target').forEach(x=>x.classList.remove('drag-target'));
+    });
     el.addEventListener('dragover',e=>{e.preventDefault();if(dragEl&&dragEl!==el){el.classList.add('drag-target');container.insertBefore(dragEl,el.nextSibling&&el.nextSibling!==dragEl?el.nextSibling:el);}});
     el.addEventListener('dragleave',()=>el.classList.remove('drag-target'));
     el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('drag-target');});
-    let touchY=0;
-    el.addEventListener('touchstart',e=>{touchY=e.touches[0].clientY;el.style.background='var(--card2)';},{passive:true});
+
+    // Mobile: only start reordering when the touch begins on the ☰ handle.
+    // Touches starting anywhere else on the card fall through to normal
+    // page scrolling (touch-action:pan-y on .sort-card allows this).
+    if(handle){
+      handle.addEventListener('touchstart',e=>{
+        touchActive=true;
+        el.classList.add('dragging');
+      },{passive:true});
+    }
     el.addEventListener('touchmove',e=>{
+      if(!touchActive)return;
       const ty=e.touches[0].clientY;
       const items=[...container.querySelectorAll('[draggable]')];
       const target=items.find(it=>{const r=it.getBoundingClientRect();return ty>=r.top&&ty<=r.bottom&&it!==el;});
       if(target)container.insertBefore(el,ty<target.getBoundingClientRect().top+target.offsetHeight/2?target:target.nextSibling);
     },{passive:true});
-    el.addEventListener('touchend',()=>el.style.background='');
+    el.addEventListener('touchend',()=>{touchActive=false;el.classList.remove('dragging');});
   });
 }
 function saveSortAndBack(){
@@ -858,6 +915,8 @@ function saveAndClose(){
   for(const id in ST.today){ST.accum[id]=(ST.accum[id]||0)+(ST.today[id]||0);}
   ST.today={};save();
   document.getElementById('reportSection').style.display='none';
+  document.getElementById('saveReminder').style.display='none';
+  document.getElementById('saveBtn').classList.remove('pulse-save');
   renderMain();
   setTimeout(()=>showOverlay("✅ บันทึกสำเร็จแล้ว",false),50);
 }
