@@ -87,6 +87,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 @keyframes rb{0%{color:#e63323}16%{color:#ff9500}32%{color:#ffcc4d}48%{color:#3ddc97}64%{color:#5ac8fa}80%{color:#a78bfa}100%{color:#e63323}}
 .credit{text-align:center;font-size:11px;color:#3a3f4a;padding:6px 0 4px;margin-top:8px;}
 #saveBtn.pulse-save{animation:pulseSave 1.1s ease-in-out infinite;}
+#saveBtn.locked{opacity:.4;filter:grayscale(70%);}
 @keyframes pulseSave{0%{box-shadow:0 0 0 0 rgba(255,204,77,.55);}70%{box-shadow:0 0 0 10px rgba(255,204,77,0);}100%{box-shadow:0 0 0 0 rgba(255,204,77,0);}}
 </style>
 </head>
@@ -139,7 +140,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   <div class="footer-bar">
     <button class="btn-reset" onclick="resetToday()">รีเซ็ต</button>
     <button class="btn-go" onclick="doGenerate()" style="flex:1.4;">FINISH!!</button>
-    <button class="btn-go" id="saveBtn" onclick="saveAndClose()" style="flex:0 0 auto;background:#1a6644;font-size:13.5px;padding:13px 16px;font-weight:900;letter-spacing:.5px;">Save</button>
+    <button class="btn-go locked" id="saveBtn" onclick="attemptSave()" style="flex:0 0 auto;background:#1a6644;font-size:13.5px;padding:13px 16px;font-weight:900;letter-spacing:.5px;">Save</button>
   </div>
 </div>
 
@@ -147,7 +148,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 <div id="screen-settings" class="screen">
   <div class="wrap">
     <div class="settings-header">
-      <button class="back-btn" onclick="goMain()">←</button>
+      <button class="back-btn" onclick="backFromSettings()">←</button>
       <h2>ตั้งค่าราคา RRP</h2>
     </div>
     <div class="brand-tabs" id="settingsTabs" style="display:flex;gap:6px;overflow-x:auto;padding:8px 0 10px;"></div>
@@ -231,7 +232,7 @@ function pcFor(b){
 }
 const BSHORT={OPPO:"O",Vivo:"V",Samsung:"S",Xiaomi:"Mi",Realme:"R",Honor:"Hn",Infinix:"Inf"};
 const NO_BILL=["ไม่เป็นไรนะ พรุ่งนี้เอาใหม่ 💪","ไม่เป็นไรนะ วันนี้ทำดีที่สุดแล้ว 🌟","วันนี้ปล่อยผ่าน พรุ่งนี้ยิ้มรับยอด! 🥰","บางวันก็เป็นแบบนี้ สู้ต่อไปนะ 🐯","วันนี้เงียบกริบ พรุ่งนี้บิลปลิวรัวๆ 📄","วันนี้ No Bill เย็นนี้หมูกระทะเยียวยา! 🥓","ทุกคนมีวันแบบนี้ อย่าท้อนะ!","สู้เขาดิวะ! พรุ่งนี้วันของเรา 🦁","ยอดไม่มา พรุ่งนี้เช็กอินลุยใหม่! 🎯","สวดมนต์แป๊บ พรุ่งนี้ลูกค้ารุมชัวร์ 🙏","บิลไม่มี แต่หนี้ยังมี สู้ต่อโว้ย! 💸","พรุ่งนี้ก้าวเท้าซ้ายเข้าร้าน ท่องคาถามหาลาภเบาๆ 🔮"];
-const WIN_MSG=["OPPO ชนะทุกมิติ! ราชาแห่ง Shop! 👑","วันนี้ OPPO เริศเลยล่ะ ✨","จบดีลสวยๆ OPPO กวาดเรียบทั้งระบบ 💚","Champion ประจำวัน OPPO #1  🥰","OPPO รวยไม่ไหวแล้วโว้ยยยย!! 💰","ชนะทั้งกระดาน! OPPO ขอเดินสับๆ รับทรัพค๊าา💃","วันนี้ OPPO กินรอบวง ปังแบบกราบตัก! 🙏","คิดจะแข่งกับ OPPO ไปอัปเกรดตัวเองมาใหม่ค๊าาา 🚀","กวาดเรียบทั้งกระดาน! วันนี้ OPPO ยืนหนึ่งในตองอู 🥇","OPPO ยอดพุ่งทะลุเพดานบินไปแล้วค๊าาา! 🛫","ชนะทั้งกระดาน! ดวงหนุนนำ ยอดปังแบบตัวมารดา 🤣","ไม่ได้มาขายขำ.. แต่มาขายดี ไม่ต้องหลบหน้าเจ้าหนี้โว้ย!!🤷‍♀️"];
+const WIN_MSG=["OPPO ชนะทุกมิติ! ราชาแห่ง Shop! 👑","วันนี้ OPPO เริศเลยล่ะ ✨","จบดีลสวยๆ OPPO กวาดเรียบทั้งระบบ 💚","Champion ประจำวัน OPPO #1  🥰","OPPO รวยไม่ไหวรวยไม่ไหว!! 💰","ชนะทั้งกระดาน! OPPO รับทรัพจ้าา💃","วันนี้ OPPO กินรอบวง ปังแบบกราบตัก! 🙏","คิดจะแข่งกับ OPPO ไปอัปเกรดตัวเองมาใหม่น๊าาา 🚀","กวาดเรียบทั้งกระดาน! วันนี้ OPPO ยืนหนึ่งในตองอู 🥇","OPPO ยอดพุ่งทะลุเพดานบินไปแล้วจ้าาา! 🛫","ชนะทั้งกระดาน! ดวงหนุนนำ ยอดปังแบบตัวมารดา 🤣","OPPO ไม่ได้มาขายขำ.. แต่มาขายดี🤷‍♀️"];
 
 // ─── MODEL DATA (per-shop overrides for name/price/order/deleted are stored separately, see ST) ──
 const RAW={
@@ -419,8 +420,8 @@ const SHOPS = {
   "tg":        {code:"KOOKTG936495", name:"TG"},
   "advice":    {code:"KAV022",       name:"Advice"},
   "ais1107":   {code:"SOM1107",      name:"AIS 1107"},
-  "asp":       {code:"KTASP",        name:"ASP"},
-  "trueshop":  {code:"TTT1570",      name:"True Shop Fashion"},
+  "asp":       {code:"ASPASP",       name:"ASP"},
+  "trueshop":  {code:"EGOIST",       name:"True Shop Fashion"},
   "dtachall":  {code:"TWDTAC",       name:"Dtac Hall Fashion"}
 };
 // Reverse lookup: login code -> internal id
@@ -653,6 +654,8 @@ function resetToday(){
   document.getElementById('reportSection').style.display='none';
   document.getElementById('saveReminder').style.display='none';
   document.getElementById('saveBtn').classList.remove('pulse-save');
+  saveUnlocked=false;
+  document.getElementById('saveBtn').classList.add('locked');
   renderMain();
 }
 
@@ -691,6 +694,7 @@ function buildNotes(){
   return notes;
 }
 
+let saveUnlocked=false;
 function doGenerate(){
   const oTQ=bTQ("OPPO"),vTQ=bTQ("Vivo");
   const oTR=bTR("OPPO"),vTR=bTR("Vivo");
@@ -706,6 +710,8 @@ function doGenerate(){
   renderReportSection(notes);
   document.getElementById('saveReminder').style.display='block';
   document.getElementById('saveBtn').classList.add('pulse-save');
+  saveUnlocked=true;
+  document.getElementById('saveBtn').classList.remove('locked');
 
   const isNoBill=oTQ===0;
   const isWin=oTQ>0&&oTQ>vTQ&&oTR>vTR;
@@ -789,7 +795,34 @@ function copyHistNote(ds,ni){
 }
 
 // SETTINGS
-function switchSettingsBrand(b){ST.sb=b;renderSettingsTabs();renderSettings();}
+// Reads whatever is currently typed into the settings inputs for `brand`
+// (if that brand's screen is the one on-screen) and commits it into ST +
+// syncs to cloud. Called before switching brand tabs or leaving the screen,
+// so edits are never silently lost — no need to press "บันทึกราคา" per brand.
+function captureSettingsInputs(brand){
+  if(!brand)return;
+  models(brand).forEach(m=>{
+    const ne=document.getElementById('sn_'+m.id);
+    const re=document.getElementById('si_'+m.id);
+    const ae=document.getElementById('sa_'+m.id);
+    if(ne&&ne.value.trim())ST.customName[m.id]=ne.value.trim();
+    if(re)ST.rrp[m.id]=parseInt(re.value)||0;
+    if(ae)ST.accum[m.id]=parseInt(ae.value)||0;
+  });
+  if(brand==="Apple"){
+    const ae=document.getElementById('sa_apple_total');
+    if(ae)ST.accum['apple_total']=parseInt(ae.value)||0;
+  }
+  save();
+}
+function switchSettingsBrand(b){
+  captureSettingsInputs(ST.sb); // keep whatever was just typed before switching away
+  ST.sb=b;renderSettingsTabs();renderSettings();
+}
+function backFromSettings(){
+  captureSettingsInputs(ST.sb); // keep whatever was just typed before leaving the screen
+  goMain();
+}
 function renderSettingsTabs(){renderBrandTabs('settingsTabs',ST.sb,'switchSettingsBrand',true);}
 function renderSettings(){
   const b=ST.sb;const ms=models(b);
@@ -831,20 +864,8 @@ function renderSettings(){
     </div>`;
 }
 function saveSettings(){
-  const b=ST.sb;
-  models(b).forEach(m=>{
-    const ne=document.getElementById('sn_'+m.id);
-    const re=document.getElementById('si_'+m.id);
-    const ae=document.getElementById('sa_'+m.id);
-    if(ne&&ne.value.trim())ST.customName[m.id]=ne.value.trim();
-    if(re)ST.rrp[m.id]=parseInt(re.value)||0;
-    if(ae)ST.accum[m.id]=parseInt(ae.value)||0;
-  });
-  if(b==="Apple"){
-    const ae=document.getElementById('sa_apple_total');
-    if(ae)ST.accum['apple_total']=parseInt(ae.value)||0;
-  }
-  save();showOverlay("บันทึกแล้ว ✓",false);
+  captureSettingsInputs(ST.sb);
+  showOverlay("บันทึกแล้ว ✓",false);
 }
 function deleteModel(brand,id){
   if(!confirm("ลบรุ่นนี้ออกจากรายการ?"))return;
@@ -930,6 +951,13 @@ function saveSortAndBack(){
   save();goMain();
 }
 
+function attemptSave(){
+  if(!saveUnlocked){
+    showOverlay("กรุณากด FINISH!! เพื่อสร้างรายงานก่อนนะ 🙏",false);
+    return;
+  }
+  saveAndClose();
+}
 function saveAndClose(){
   const hasData=Object.keys(ST.today).some(k=>ST.today[k]>0);
   if(!hasData){showOverlay("ยังไม่มียอดขายวันนี้ 🤔",false);return;}
@@ -939,6 +967,8 @@ function saveAndClose(){
   document.getElementById('reportSection').style.display='none';
   document.getElementById('saveReminder').style.display='none';
   document.getElementById('saveBtn').classList.remove('pulse-save');
+  saveUnlocked=false;
+  document.getElementById('saveBtn').classList.add('locked');
   renderMain();
   setTimeout(()=>showOverlay("✅ บันทึกสำเร็จแล้ว",false),50);
 }
