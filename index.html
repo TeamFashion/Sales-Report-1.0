@@ -185,7 +185,15 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <button class="back-btn" onclick="goMain()">←</button>
       <h2>ประวัติรีพอร์ทย้อนหลัง</h2>
     </div>
-    <div style="font-size:12.5px;font-weight:700;color:#60a5d4;padding:4px 2px 8px;">รายวัน (ย้อนหลังสูงสุด 32 วัน)</div>
+    <div style="font-size:12.5px;font-weight:700;color:#60a5d4;padding:4px 2px 8px;">สรุปยอดตามช่วงราคา (ทุกแบรนด์ ยกเว้น Apple · ยอดสะสมเดือนนี้)</div>
+    <div id="priceBandSummary"></div>
+    <div style="background:var(--card);border:1px dashed var(--accent2);border-radius:12px;padding:12px 13px;margin:6px 0 4px;">
+      <div style="font-size:12px;color:var(--accent2);font-weight:600;margin-bottom:8px;">ตั้งค่าช่วงราคา (ปรับได้ภายหลัง — เฉพาะร้านนี้)</div>
+      <div id="priceBandEditor"></div>
+      <button onclick="savePriceBands()" style="margin-top:4px;width:100%;padding:9px;border-radius:9px;border:none;background:var(--accent2);color:#0d2a1f;font-weight:700;font-size:13px;cursor:pointer;">บันทึกช่วงราคา ✓</button>
+    </div>
+
+    <div style="font-size:12.5px;font-weight:700;color:#60a5d4;padding:20px 2px 8px;">รายวัน (ย้อนหลังสูงสุด 32 วัน)</div>
     <div id="histList"></div>
     <div style="font-size:12.5px;font-weight:700;color:#60a5d4;padding:20px 2px 8px;">สรุปปิดเดือน (ย้อนหลังสูงสุด 1 ปี)</div>
     <div id="monthlyHistList"></div>
@@ -455,7 +463,7 @@ let syncTimer = null;
 let unsubListener = null;
 let _pushing=false;
 
-let ST={ab:"OPPO",sb:"OPPO",ob:"OPPO",settingsMode:"edit",today:{},accum:{},rrp:{},order:{},customName:{},deleted:{},customModels:{},mk:MK};
+let ST={ab:"OPPO",sb:"OPPO",ob:"OPPO",settingsMode:"edit",today:{},accum:{},rrp:{},order:{},customName:{},deleted:{},customModels:{},priceBands:null,mk:MK};
 let HIST=[]; // {dateStr, notes:[str,...]} max 32 days
 let MONTHLY_HIST=[]; // {mk, label, dateStr, notes:[str,...]} — one snapshot per month, max 12 months
 
@@ -468,7 +476,7 @@ function histRef(){ return db.ref('shops/'+SHOP_ID+'/hist'); }
 function monthlyHistRef(){ return db.ref('shops/'+SHOP_ID+'/monthlyHist'); }
 
 function saveLocal(){
-  try{localStorage.setItem('tsr_'+SHOP_ID,JSON.stringify({mk:MK,today:ST.today,accum:ST.accum,rrp:ST.rrp,order:ST.order,customName:ST.customName,deleted:ST.deleted||{},customModels:ST.customModels||{}}));}catch(e){}
+  try{localStorage.setItem('tsr_'+SHOP_ID,JSON.stringify({mk:MK,today:ST.today,accum:ST.accum,rrp:ST.rrp,order:ST.order,customName:ST.customName,deleted:ST.deleted||{},customModels:ST.customModels||{},priceBands:ST.priceBands||null}));}catch(e){}
   try{localStorage.setItem('tsr_hist_'+SHOP_ID,JSON.stringify(HIST.slice(-32)));}catch(e){}
   try{localStorage.setItem('tsr_mhist_'+SHOP_ID,JSON.stringify(MONTHLY_HIST.slice(-12)));}catch(e){}
 }
@@ -476,7 +484,7 @@ function loadLocal(){
   try{
     const s=localStorage.getItem('tsr_'+SHOP_ID);
     if(s){const p=JSON.parse(s);
-      ST.rrp=p.rrp||{};ST.order=p.order||{};ST.customName=p.customName||{};ST.deleted=p.deleted||{};ST.customModels=p.customModels||{};
+      ST.rrp=p.rrp||{};ST.order=p.order||{};ST.customName=p.customName||{};ST.deleted=p.deleted||{};ST.customModels=p.customModels||{};ST.priceBands=p.priceBands||null;
       if(p.mk===MK){ST.today=p.today||{};ST.accum=p.accum||{};}
       else{ST.today={};ST.accum={};}
     }
@@ -486,7 +494,7 @@ function loadLocal(){
 }
 function applyCloud(p){
   if(!p)return;
-  ST.rrp=p.rrp||{};ST.order=p.order||{};ST.customName=p.customName||{};ST.deleted=p.deleted||{};ST.customModels=p.customModels||{};
+  ST.rrp=p.rrp||{};ST.order=p.order||{};ST.customName=p.customName||{};ST.deleted=p.deleted||{};ST.customModels=p.customModels||{};ST.priceBands=p.priceBands||null;
   if(p.mk===MK){ST.today=p.today||{};ST.accum=p.accum||{};}
   else{ST.today={};ST.accum={};}
 }
@@ -497,7 +505,7 @@ function pushCloud(){
     setDot('#ffcc4d','กำลัง sync...');
     _pushing=true;
     const payload={today:ST.today,accum:ST.accum,rrp:ST.rrp,order:ST.order,
-      customName:ST.customName,deleted:ST.deleted||{},customModels:ST.customModels||{},mk:MK,ts:Date.now()};
+      customName:ST.customName,deleted:ST.deleted||{},customModels:ST.customModels||{},priceBands:ST.priceBands||null,mk:MK,ts:Date.now()};
     dbRef().set(payload)
       .then(()=>{ setDot('#3ddc97','Synced ✓'); setTimeout(()=>{_pushing=false;},500); })
       .catch(()=>{ setDot('#ff5c6c','Sync failed'); _pushing=false; });
@@ -635,7 +643,7 @@ function monthLabelFromMk(mk){
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));document.getElementById(id).classList.add('act');}
 function goMain(){showScreen('screen-main');renderMain();}
 function goSettings(){ST.sb="OPPO";ST.settingsMode="edit";showScreen('screen-settings');renderSettingsTabs();renderSettings();}
-function goHistory(){showScreen('screen-history');renderHistory();renderMonthlyHistory();}
+function goHistory(){showScreen('screen-history');renderPriceBandEditor();renderPriceBandSummary();renderHistory();renderMonthlyHistory();}
 
 function renderMain(){
   const shopName=(SHOPS[SHOP_ID]&&SHOPS[SHOP_ID].name)||'Sale Report';
@@ -878,6 +886,97 @@ function copyMonthlyNote(mk,ni){
   navigator.clipboard.writeText(txt).then(doCopy).catch(()=>{
     const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);doCopy();
   });
+}
+
+// PRICE-BAND SUMMARY
+// Groups this month's accumulated unit sales (all brands except Apple) into
+// up to 3 configurable price ranges, per shop. Pure read/aggregate feature —
+// never touches ST.rrp/order/customModels/deleted/accum/today, only reads them.
+function defaultPriceBands(){
+  return [{min:6999,max:9999},{min:10000,max:14999},{min:15000,max:19999}];
+}
+function getPriceBands(){
+  return (ST.priceBands && ST.priceBands.length===3) ? ST.priceBands : defaultPriceBands();
+}
+function computePriceBandSummary(){
+  const bands=getPriceBands();
+  const totals=[0,0,0];
+  const byBrand=[{},{},{}];
+  let other=0;
+  const otherByBrand={};
+  BRANDS.filter(b=>b!=="Apple").forEach(brand=>{
+    models(brand).forEach(m=>{
+      const qty=mq(m.id);
+      if(!qty)return;
+      const price=rrp(m.id);
+      let matched=false;
+      bands.forEach((bd,i)=>{
+        if(price>=bd.min && price<=bd.max){
+          totals[i]+=qty;
+          byBrand[i][brand]=(byBrand[i][brand]||0)+qty;
+          matched=true;
+        }
+      });
+      if(!matched){
+        other+=qty;
+        otherByBrand[brand]=(otherByBrand[brand]||0)+qty;
+      }
+    });
+  });
+  return {bands,totals,byBrand,other,otherByBrand};
+}
+let priceBandOpen=[false,false,false,false];
+function brandBreakdownHTML(obj){
+  const entries=Object.entries(obj).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length)return '<div style="font-size:12px;color:var(--sub);">ไม่มียอดในช่วงนี้</div>';
+  return entries.map(([br,q])=>`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--sub);padding:2px 0;"><span>${br}</span><span>${q} เครื่อง</span></div>`).join('');
+}
+function renderPriceBandSummary(){
+  const el=document.getElementById('priceBandSummary');
+  if(!el)return;
+  const {bands,totals,byBrand,other,otherByBrand}=computePriceBandSummary();
+  let html=bands.map((bd,i)=>`<div class="hist-day">
+      <div class="hist-head" onclick="togglePriceBand(${i})">
+        <div class="hist-head-left">฿${fmt(bd.min)} - ฿${fmt(bd.max)}</div>
+        <div class="hist-head-right">${totals[i]} เครื่อง ${priceBandOpen[i]?'▲':'▼'}</div>
+      </div>
+      ${priceBandOpen[i]?`<div class="hist-body">${brandBreakdownHTML(byBrand[i])}</div>`:''}
+    </div>`).join('');
+  if(other>0){
+    html+=`<div class="hist-day" style="opacity:.8;">
+      <div class="hist-head" onclick="togglePriceBand(3)">
+        <div class="hist-head-left">นอกช่วงราคาที่กำหนด</div>
+        <div class="hist-head-right">${other} เครื่อง ${priceBandOpen[3]?'▲':'▼'}</div>
+      </div>
+      ${priceBandOpen[3]?`<div class="hist-body">${brandBreakdownHTML(otherByBrand)}</div>`:''}
+    </div>`;
+  }
+  el.innerHTML=html;
+}
+function togglePriceBand(i){priceBandOpen[i]=!priceBandOpen[i];renderPriceBandSummary();}
+function renderPriceBandEditor(){
+  const el=document.getElementById('priceBandEditor');
+  if(!el)return;
+  const bands=getPriceBands();
+  el.innerHTML=bands.map((bd,i)=>`
+    <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px;">
+      <span style="font-size:12px;color:var(--sub);width:46px;flex-shrink:0;">ช่วง ${i+1}</span>
+      <input type="number" class="si-inp" id="pbmin_${i}" value="${bd.min}" min="0" step="100" style="width:auto;flex:1;font-size:13px;text-align:left;" placeholder="ต่ำสุด">
+      <span style="color:var(--sub);">-</span>
+      <input type="number" class="si-inp" id="pbmax_${i}" value="${bd.max}" min="0" step="100" style="width:auto;flex:1;font-size:13px;text-align:left;" placeholder="สูงสุด">
+    </div>`).join('')
+    + `<div style="font-size:10.5px;color:var(--sub);margin-top:2px;">* ตั้งแยกเฉพาะร้านนี้เท่านั้น ไม่กระทบร้านอื่น · ควรตั้งช่วงราคาไม่ให้ซ้อนทับกัน</div>`;
+}
+function savePriceBands(){
+  const bands=[0,1,2].map(i=>{
+    const min=parseInt(document.getElementById('pbmin_'+i).value)||0;
+    const max=parseInt(document.getElementById('pbmax_'+i).value)||0;
+    return {min:Math.min(min,max), max:Math.max(min,max)};
+  });
+  ST.priceBands=bands;
+  save();
+  renderPriceBandSummary();
+  showOverlay("บันทึกช่วงราคาแล้ว ✓",false);
 }
 
 // SETTINGS
