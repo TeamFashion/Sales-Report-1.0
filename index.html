@@ -185,7 +185,11 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <button class="back-btn" onclick="goMain()">←</button>
       <h2>ประวัติรีพอร์ทย้อนหลัง</h2>
     </div>
-    <div style="font-size:12.5px;font-weight:700;color:#60a5d4;padding:4px 2px 8px;">สรุปยอดตามช่วงราคา (ทุกแบรนด์ ยกเว้น Apple · ยอดสะสมเดือนนี้)</div>
+    <div style="padding:4px 2px 10px;">
+      <div style="font-size:13.5px;font-weight:700;color:#60a5d4;">สรุปยอดตามช่วงราคา</div>
+      <div style="font-size:11.5px;color:var(--sub);margin-top:2px;">ทุกแบรนด์ยกเว้น Apple</div>
+    </div>
+    <select id="priceBandMonthSel" class="si-inp" style="width:100%;text-align:left;font-size:13px;margin-bottom:8px;" onchange="renderPriceBandSummary()"></select>
     <div id="priceBandSummary"></div>
     <div style="background:var(--card);border:1px dashed var(--accent2);border-radius:12px;padding:12px 13px;margin:6px 0 4px;">
       <div style="font-size:12px;color:var(--accent2);font-weight:600;margin-bottom:8px;">ตั้งค่าช่วงราคา (ปรับได้ภายหลัง — เฉพาะร้านนี้)</div>
@@ -466,6 +470,7 @@ let _pushing=false;
 let ST={ab:"OPPO",sb:"OPPO",ob:"OPPO",settingsMode:"edit",today:{},accum:{},rrp:{},order:{},customName:{},deleted:{},customModels:{},priceBands:null,mk:MK};
 let HIST=[]; // {dateStr, notes:[str,...]} max 32 days
 let MONTHLY_HIST=[]; // {mk, label, dateStr, notes:[str,...]} — one snapshot per month, max 12 months
+let MONTHLY_ACCUM_SNAPSHOT={}; // {mk: {modelId: qty, ...}} — per-model accumulated totals archived at month rollover, up to 12 months. Only starts filling in from the month this feature first ships; earlier months have no entry.
 
 function setDot(color, title){
   const d=document.getElementById('syncDot');
@@ -474,19 +479,46 @@ function setDot(color, title){
 function dbRef(){ return db.ref('shops/'+SHOP_ID+'/data'); }
 function histRef(){ return db.ref('shops/'+SHOP_ID+'/hist'); }
 function monthlyHistRef(){ return db.ref('shops/'+SHOP_ID+'/monthlyHist'); }
+function monthlyAccumRef(){ return db.ref('shops/'+SHOP_ID+'/monthlyAccum'); }
+
+// Archives a past month's full per-model accumulated totals (used by the
+// price-band month selector) the moment a month rollover is detected —
+// idempotent, safe to call more than once for the same mk.
+function captureMonthlyAccumSnapshot(oldMk, accumMap){
+  if(!oldMk || oldMk===MK) return;
+  if(MONTHLY_ACCUM_SNAPSHOT[oldMk]) return; // already archived
+  MONTHLY_ACCUM_SNAPSHOT[oldMk]={...(accumMap||{})};
+  const keys=Object.keys(MONTHLY_ACCUM_SNAPSHOT);
+  if(keys.length>12){
+    const sorted=keys.sort((a,b)=>{
+      const [ay,am]=a.split('-').map(Number), [by,bm]=b.split('-').map(Number);
+      return (ay*12+am)-(by*12+bm);
+    });
+    sorted.slice(0,sorted.length-12).forEach(k=>delete MONTHLY_ACCUM_SNAPSHOT[k]);
+  }
+  saveLocal();
+  // Intentionally does NOT push to cloud here — the caller is responsible for
+  // that, after merging with whatever is already on the cloud (see doLogin /
+  // subscribeRealtime), so a fetch that resolves later can't clobber this.
+}
 
 function saveLocal(){
   try{localStorage.setItem('tsr_'+SHOP_ID,JSON.stringify({mk:MK,today:ST.today,accum:ST.accum,rrp:ST.rrp,order:ST.order,customName:ST.customName,deleted:ST.deleted||{},customModels:ST.customModels||{},priceBands:ST.priceBands||null}));}catch(e){}
   try{localStorage.setItem('tsr_hist_'+SHOP_ID,JSON.stringify(HIST.slice(-32)));}catch(e){}
   try{localStorage.setItem('tsr_mhist_'+SHOP_ID,JSON.stringify(MONTHLY_HIST.slice(-12)));}catch(e){}
+  try{localStorage.setItem('tsr_maccum_'+SHOP_ID,JSON.stringify(MONTHLY_ACCUM_SNAPSHOT));}catch(e){}
 }
 function loadLocal(){
+  try{const ms=localStorage.getItem('tsr_maccum_'+SHOP_ID);if(ms)MONTHLY_ACCUM_SNAPSHOT=JSON.parse(ms);}catch(e){}
   try{
     const s=localStorage.getItem('tsr_'+SHOP_ID);
     if(s){const p=JSON.parse(s);
       ST.rrp=p.rrp||{};ST.order=p.order||{};ST.customName=p.customName||{};ST.deleted=p.deleted||{};ST.customModels=p.customModels||{};ST.priceBands=p.priceBands||null;
       if(p.mk===MK){ST.today=p.today||{};ST.accum=p.accum||{};}
-      else{ST.today={};ST.accum={};}
+      else{
+        captureMonthlyAccumSnapshot(p.mk, p.accum||{});
+        ST.today={};ST.accum={};
+      }
     }
   }catch(e){}
   try{const h=localStorage.getItem('tsr_hist_'+SHOP_ID);if(h)HIST=JSON.parse(h);}catch(e){}
@@ -496,7 +528,10 @@ function applyCloud(p){
   if(!p)return;
   ST.rrp=p.rrp||{};ST.order=p.order||{};ST.customName=p.customName||{};ST.deleted=p.deleted||{};ST.customModels=p.customModels||{};ST.priceBands=p.priceBands||null;
   if(p.mk===MK){ST.today=p.today||{};ST.accum=p.accum||{};}
-  else{ST.today={};ST.accum={};}
+  else{
+    captureMonthlyAccumSnapshot(p.mk, p.accum||{});
+    ST.today={};ST.accum={};
+  }
 }
 function pushCloud(){
   if(!SHOP_ID)return;
@@ -519,7 +554,10 @@ function subscribeRealtime(){
     if(p){
       const oldMk=p.mk;
       applyCloud(p);saveLocal();renderMain();setDot('#3ddc97','Synced ✓');
-      if(oldMk && oldMk!==MK) captureMonthlyClose(oldMk);
+      if(oldMk && oldMk!==MK){
+        captureMonthlyClose(oldMk);
+        monthlyAccumRef().set(MONTHLY_ACCUM_SNAPSHOT).catch(()=>{});
+      }
     }
   }, ()=>setDot('#ff5c6c','ไม่มีสัญญาณ'));
 }
@@ -572,6 +610,15 @@ function doLogin(){
     return monthlyHistRef().once('value');
   }).then(snap=>{
     if(snap&&snap.exists())MONTHLY_HIST=snap.val()||[];
+    return monthlyAccumRef().once('value');
+  }).then(snap=>{
+    // Merge: cloud data as the base, but keep anything captured in-memory
+    // just now (step 1, via applyCloud) — never let a slightly-stale cloud
+    // read clobber a snapshot that was only just archived this session.
+    const cloudSnapshot=(snap&&snap.exists())?(snap.val()||{}):{};
+    MONTHLY_ACCUM_SNAPSHOT={...cloudSnapshot, ...MONTHLY_ACCUM_SNAPSHOT};
+    monthlyAccumRef().set(MONTHLY_ACCUM_SNAPSHOT).catch(()=>{});
+    saveLocal();
     if(_oldMk && _oldMk!==MK) captureMonthlyClose(_oldMk);
     setDot('#3ddc97','Synced ✓');
     subscribeRealtime();
@@ -643,7 +690,7 @@ function monthLabelFromMk(mk){
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));document.getElementById(id).classList.add('act');}
 function goMain(){showScreen('screen-main');renderMain();}
 function goSettings(){ST.sb="OPPO";ST.settingsMode="edit";showScreen('screen-settings');renderSettingsTabs();renderSettings();}
-function goHistory(){showScreen('screen-history');renderPriceBandEditor();renderPriceBandSummary();renderHistory();renderMonthlyHistory();}
+function goHistory(){showScreen('screen-history');renderPriceBandEditor();renderPriceBandMonthOptions();renderPriceBandSummary();renderHistory();renderMonthlyHistory();}
 
 function renderMain(){
   const shopName=(SHOPS[SHOP_ID]&&SHOPS[SHOP_ID].name)||'Sale Report';
@@ -898,49 +945,74 @@ function defaultPriceBands(){
 function getPriceBands(){
   return (ST.priceBands && ST.priceBands.length===3) ? ST.priceBands : defaultPriceBands();
 }
-function computePriceBandSummary(){
+// selectedMk: "YYYY-M" of the month to summarize, or omitted/MK for the
+// live current month (today + accumulated). Past months read from the
+// archived per-model snapshot captured automatically at month rollover —
+// only available for months since this feature shipped.
+function computePriceBandSummary(selectedMk){
   const bands=getPriceBands();
   const totals=[0,0,0];
   const byBrand=[{},{},{}];
+  const byModel=[{},{},{}]; // per band: {brand: [{name, qty}, ...]}
   let other=0;
   const otherByBrand={};
+  const otherByModel={};
+  const useCurrent=!selectedMk||selectedMk===MK;
+  const snapshot=useCurrent?null:(MONTHLY_ACCUM_SNAPSHOT[selectedMk]||{});
+  const qtyFor=id=>useCurrent?mq(id):(snapshot[id]||0);
   BRANDS.filter(b=>b!=="Apple").forEach(brand=>{
     models(brand).forEach(m=>{
-      const qty=mq(m.id);
+      const qty=qtyFor(m.id);
       if(!qty)return;
       const price=rrp(m.id);
+      const name=ST.customName[m.id]||m.name;
       let matched=false;
       bands.forEach((bd,i)=>{
         if(price>=bd.min && price<=bd.max){
           totals[i]+=qty;
           byBrand[i][brand]=(byBrand[i][brand]||0)+qty;
+          if(!byModel[i][brand])byModel[i][brand]=[];
+          byModel[i][brand].push({name,qty});
           matched=true;
         }
       });
       if(!matched){
         other+=qty;
         otherByBrand[brand]=(otherByBrand[brand]||0)+qty;
+        if(!otherByModel[brand])otherByModel[brand]=[];
+        otherByModel[brand].push({name,qty});
       }
     });
   });
-  return {bands,totals,byBrand,other,otherByBrand};
+  return {bands,totals,byBrand,byModel,other,otherByBrand,otherByModel};
 }
 let priceBandOpen=[false,false,false,false];
-function brandBreakdownHTML(obj){
-  const entries=Object.entries(obj).sort((a,b)=>b[1]-a[1]);
+// Shows each brand's total, and under it every model + quantity sold in
+// that brand — lets staff verify exactly which model the number came from.
+function brandBreakdownHTML(brandTotals,brandModels){
+  const entries=Object.entries(brandTotals).sort((a,b)=>b[1]-a[1]);
   if(!entries.length)return '<div style="font-size:12px;color:var(--sub);">ไม่มียอดในช่วงนี้</div>';
-  return entries.map(([br,q])=>`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--sub);padding:2px 0;"><span>${br}</span><span>${q} เครื่อง</span></div>`).join('');
+  return entries.map(([br,q])=>{
+    const ms=(brandModels[br]||[]).slice().sort((a,b)=>b.qty-a.qty);
+    const modelLines=ms.map(m=>`<div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--sub);padding:2px 0 2px 12px;"><span>${m.name}</span><span>${m.qty} เครื่อง</span></div>`).join('');
+    return `<div style="margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text);font-weight:600;padding:2px 0;"><span>${br}</span><span>${q} เครื่อง</span></div>
+      ${modelLines}
+    </div>`;
+  }).join('');
 }
 function renderPriceBandSummary(){
   const el=document.getElementById('priceBandSummary');
   if(!el)return;
-  const {bands,totals,byBrand,other,otherByBrand}=computePriceBandSummary();
+  const sel=document.getElementById('priceBandMonthSel');
+  const selectedMk=sel?sel.value:MK;
+  const {bands,totals,byBrand,byModel,other,otherByBrand,otherByModel}=computePriceBandSummary(selectedMk);
   let html=bands.map((bd,i)=>`<div class="hist-day">
       <div class="hist-head" onclick="togglePriceBand(${i})">
         <div class="hist-head-left">฿${fmt(bd.min)} - ฿${fmt(bd.max)}</div>
         <div class="hist-head-right">${totals[i]} เครื่อง ${priceBandOpen[i]?'▲':'▼'}</div>
       </div>
-      ${priceBandOpen[i]?`<div class="hist-body">${brandBreakdownHTML(byBrand[i])}</div>`:''}
+      ${priceBandOpen[i]?`<div class="hist-body">${brandBreakdownHTML(byBrand[i],byModel[i])}</div>`:''}
     </div>`).join('');
   if(other>0){
     html+=`<div class="hist-day" style="opacity:.8;">
@@ -948,22 +1020,39 @@ function renderPriceBandSummary(){
         <div class="hist-head-left">นอกช่วงราคาที่กำหนด</div>
         <div class="hist-head-right">${other} เครื่อง ${priceBandOpen[3]?'▲':'▼'}</div>
       </div>
-      ${priceBandOpen[3]?`<div class="hist-body">${brandBreakdownHTML(otherByBrand)}</div>`:''}
+      ${priceBandOpen[3]?`<div class="hist-body">${brandBreakdownHTML(otherByBrand,otherByModel)}</div>`:''}
     </div>`;
   }
   el.innerHTML=html;
 }
 function togglePriceBand(i){priceBandOpen[i]=!priceBandOpen[i];renderPriceBandSummary();}
+// Populates the month dropdown: current month + any archived months
+// (newest first), from MONTHLY_ACCUM_SNAPSHOT.
+function renderPriceBandMonthOptions(){
+  const sel=document.getElementById('priceBandMonthSel');
+  if(!sel)return;
+  const prev=sel.value;
+  const months=Object.keys(MONTHLY_ACCUM_SNAPSHOT).sort((a,b)=>{
+    const [ay,am]=a.split('-').map(Number), [by,bm]=b.split('-').map(Number);
+    return (by*12+bm)-(ay*12+am); // descending
+  });
+  const opts=[`<option value="${MK}">เดือนนี้ (${mthName(NOW)})</option>`]
+    .concat(months.map(mk=>`<option value="${mk}">${monthLabelFromMk(mk)}</option>`));
+  sel.innerHTML=opts.join('');
+  if(prev && (prev===MK || months.includes(prev))) sel.value=prev;
+}
 function renderPriceBandEditor(){
   const el=document.getElementById('priceBandEditor');
   if(!el)return;
   const bands=getPriceBands();
   el.innerHTML=bands.map((bd,i)=>`
-    <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px;">
-      <span style="font-size:12px;color:var(--sub);width:46px;flex-shrink:0;">ช่วง ${i+1}</span>
-      <input type="number" class="si-inp" id="pbmin_${i}" value="${bd.min}" min="0" step="100" style="width:auto;flex:1;font-size:13px;text-align:left;" placeholder="ต่ำสุด">
-      <span style="color:var(--sub);">-</span>
-      <input type="number" class="si-inp" id="pbmax_${i}" value="${bd.max}" min="0" step="100" style="width:auto;flex:1;font-size:13px;text-align:left;" placeholder="สูงสุด">
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11.5px;color:var(--sub);margin-bottom:5px;">ช่วงที่ ${i+1}</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="number" class="si-inp" id="pbmin_${i}" value="${bd.min}" min="0" step="100" style="flex:1;min-width:0;width:0;font-size:13px;text-align:center;padding:7px 6px;" placeholder="ต่ำสุด">
+        <span style="color:var(--sub);flex-shrink:0;">-</span>
+        <input type="number" class="si-inp" id="pbmax_${i}" value="${bd.max}" min="0" step="100" style="flex:1;min-width:0;width:0;font-size:13px;text-align:center;padding:7px 6px;" placeholder="สูงสุด">
+      </div>
     </div>`).join('')
     + `<div style="font-size:10.5px;color:var(--sub);margin-top:2px;">* ตั้งแยกเฉพาะร้านนี้เท่านั้น ไม่กระทบร้านอื่น · ควรตั้งช่วงราคาไม่ให้ซ้อนทับกัน</div>`;
 }
