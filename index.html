@@ -25,6 +25,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .sum-pill{background:var(--card2);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--sub);}
 .sum-pill b{color:var(--text);}
 .mth-pill{background:#1a2a3a;border-color:#2a4a6a;color:#60a5d4;}
+.brand-tabs .btab.wide{grid-column:1/-1;}
 .brand-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:8px 0 10px;}
 .btab{padding:7px 3px;border-radius:10px;background:var(--card2);color:var(--sub);font-size:11.5px;cursor:pointer;border:1px solid var(--line);white-space:nowrap;text-align:center;}
 .btab.act{background:var(--accent);color:#fff;border-color:var(--accent);}
@@ -225,8 +226,8 @@ const MK=NOW.getFullYear()+"-"+NOW.getMonth();
 const THAI_MONTHS=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
 
 // ─── BRAND CONFIG ──────────────────────────────────────────────
-const BRANDS=["OPPO","Vivo","Samsung","Xiaomi","Realme","Honor","Infinix","Apple"];
-const PC_DEF={OPPO:2,Vivo:2,Samsung:2,Xiaomi:1,Realme:1,Honor:1,Infinix:1,Apple:1};
+const BRANDS=["OPPO","Vivo","Samsung","Xiaomi","Realme","Honor","Infinix","Tecno","Apple"];
+const PC_DEF={OPPO:2,Vivo:2,Samsung:2,Xiaomi:1,Realme:1,Honor:1,Infinix:1,Tecno:1,Apple:1};
 // Per-shop Pc override (falls back to PC_DEF above if a shop/brand isn't listed).
 // Key = internal shop id (matches SHOPS above). Apple = "iPhone" column.
 const PC_BY_SHOP={
@@ -250,7 +251,7 @@ function pcFor(b){
   if(m && m[b]!==undefined) return m[b];
   return PC_DEF[b]!==undefined?PC_DEF[b]:0;
 }
-const BSHORT={OPPO:"O",Vivo:"V",Samsung:"S",Xiaomi:"Mi",Realme:"R",Honor:"Hn",Infinix:"Inf"};
+const BSHORT={OPPO:"O",Vivo:"V",Samsung:"S",Xiaomi:"Mi",Realme:"R",Honor:"Hn",Infinix:"Inf",Tecno:"Tecno"};
 const NO_BILL=["ไม่เป็นไรนะ พรุ่งนี้เอาใหม่ 💪","ไม่เป็นไรนะ วันนี้ทำดีที่สุดแล้ว 🌟","วันนี้ปล่อยผ่าน พรุ่งนี้ยิ้มรับยอด! 🥰","บางวันก็เป็นแบบนี้ สู้ต่อไปนะ 🐯","วันนี้เงียบกริบ พรุ่งนี้บิลปลิวรัวๆ 📄","วันนี้ No Bill เย็นนี้หมูกระทะเยียวยา! 🥓","ทุกคนมีวันแบบนี้ อย่าท้อนะ!","สู้เขาดิวะ! พรุ่งนี้วันของเรา 🦁","ยอดไม่มา พรุ่งนี้เช็กอินลุยใหม่! 🎯","สวดมนต์แป๊บ พรุ่งนี้ลูกค้ารุมชัวร์ 🙏","บิลไม่มี แต่หนี้ยังมี สู้ต่อโว้ย! 💸","พรุ่งนี้ก้าวเท้าซ้ายเข้าร้าน ท่องคาถามหาลาภเบาๆ 🔮"];
 const WIN_MSG=["OPPO ชนะทุกมิติ! ราชาแห่ง Shop! 👑","วันนี้ OPPO เริศเลยล่ะ ✨","จบดีลสวยๆ OPPO กวาดเรียบทั้งระบบ 💚","Champion ประจำวัน OPPO #1  🥰","OPPO รวยไม่ไหวแล้วโว้ยยยย!! 💰","ชนะทั้งกระดาน! OPPO ขอเดินสับๆ รับทรัพค๊าา💃","วันนี้ OPPO กินรอบวง ปังแบบกราบตัก! 🙏","คิดจะแข่งกับ OPPO ไปอัปเกรดตัวเองมาใหม่ค๊าาา 🚀","กวาดเรียบทั้งกระดาน! วันนี้ OPPO ยืนหนึ่งในตองอู 🥇","OPPO ยอดพุ่งทะลุเพดานบินไปแล้วค๊าาา! 🛫","ชนะทั้งกระดาน! ดวงหนุนนำ ยอดปังแบบตัวมารดา 🤣","ไม่ได้มาขายขำ.. แต่มาขายดี ไม่ต้องหลบหน้าเจ้าหนี้โว้ย!!🤷‍♀️"];
 
@@ -414,6 +415,30 @@ Infinix:[
   {id:"inf_note60pro8128",name:"Note60Pro 8/128",rrp:10999},
   {id:"inf_note60pro12128",name:"Note60Pro 12/128",rrp:12999},
   {id:"inf_gt50pro",name:"GT50Pro",rrp:15999},
+],
+Tecno:[
+  {id:"tc_sgo2464",name:"Spark Go 2 4/64",rrp:2499},
+  {id:"tc_sgo24128",name:"Spark Go 2 4/128",rrp:2899},
+  {id:"tc_sgo3464",name:"Spark Go 3 4/64",rrp:3799},
+  {id:"tc_sgo34128",name:"Spark Go 3 4/128",rrp:4299},
+  {id:"tc_s7pro",name:"Spark 7 Pro 4/128",rrp:4590},
+  {id:"tc_s40c8128",name:"Spark 40C 8/128",rrp:3699},
+  {id:"tc_s40c8256",name:"Spark 40C 8/256",rrp:4199},
+  {id:"tc_s405g4128",name:"Spark 40 5G 4/128",rrp:4299},
+  {id:"tc_s405g8256",name:"Spark 40 5G 8/256",rrp:5499},
+  {id:"tc_s505g4128",name:"Spark 50 5G 4/128",rrp:6999},
+  {id:"tc_s506128",name:"Spark 50 6/128",rrp:7499},
+  {id:"tc_pslim",name:"Pova Slim 5G 8/256",rrp:8999},
+  {id:"tc_p7",name:"Pova 7 5G 8/256",rrp:7999},
+  {id:"tc_p7u",name:"Pova 7 Ultra 12/256",rrp:13999},
+  {id:"tc_p86128",name:"Pova 8 6/128",rrp:9999},
+  {id:"tc_p88128",name:"Pova 8 8/128",rrp:11999},
+  {id:"tc_p88256",name:"Pova 8 8/256",rrp:12999},
+  {id:"tc_p8p8256",name:"Pova 8 Pro 8/256",rrp:14999},
+  {id:"tc_p8p12256",name:"Pova 8 Pro 12/256",rrp:16999},
+  {id:"tc_p8p12512",name:"Pova 8 Pro 12/512",rrp:18999},
+  {id:"tc_cs8128",name:"Camon Slim 8/128",rrp:14999},
+  {id:"tc_cs8256",name:"Camon Slim 8/256",rrp:15999},
 ],
 Apple:[]
 };
@@ -711,7 +736,7 @@ function renderBrandTabs(cid,active,fn,scrollable){
   } else {
     el.innerHTML=BRANDS.map(b=>{
       const cnt=bTQ(b);
-      return `<button class="btab ${b===active?'act':''}" onclick="${fn}('${b}')">${b}<span class="bc">${cnt>0?cnt:''}</span></button>`;
+      return `<button class="btab ${b===active?'act':''}${b==="Apple"?' wide':''}" onclick="${fn}('${b}')">${b}<span class="bc">${cnt>0?cnt:''}</span></button>`;
     }).join('');
   }
 }
